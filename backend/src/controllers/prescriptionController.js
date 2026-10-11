@@ -4,7 +4,26 @@ const { sendSuccess, sendError } = require('../utils/response');
 exports.getPrescriptions = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.*, pat.first_name, pat.last_name, d.doctor_name
+      `SELECT p.*,
+              p.prescription_date AS date,
+              pat.name AS patient_name,
+              d.name AS doctor_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                  'medicine_id', pd.medicine_id,
+                  'id', pd.medicine_id,
+                  'medicine_name', m.name,
+                  'name', m.name,
+                  'dosage', pd.dosage,
+                  'dose', pd.dosage,
+                  'quantity', pd.quantity,
+                  'qty', pd.quantity
+                ))
+                FROM prescription_detail pd
+                JOIN medicine m ON m.medicine_id = pd.medicine_id
+                WHERE pd.prescription_id = p.prescription_id
+                ), '[]'::json
+              ) AS medicines
        FROM prescription p
        JOIN patient pat ON pat.patient_id = p.patient_id
        JOIN doctor d ON d.doctor_id = p.doctor_id
@@ -19,7 +38,7 @@ exports.getPrescriptions = async (req, res, next) => {
 exports.getPrescriptionById = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.*, pat.first_name, pat.last_name, d.doctor_name
+      `SELECT p.*, pat.name AS patient_name, d.name AS doctor_name
        FROM prescription p
        JOIN patient pat ON pat.patient_id = p.patient_id
        JOIN doctor d ON d.doctor_id = p.doctor_id
@@ -29,7 +48,7 @@ exports.getPrescriptionById = async (req, res, next) => {
     if (!result.rows.length) return sendError(res, 404, 'Prescription not found.');
 
     const details = await db.query(
-      `SELECT pd.*, m.medicine_name
+      `SELECT pd.*, m.name AS medicine_name
        FROM prescription_detail pd
        JOIN medicine m ON m.medicine_id = pd.medicine_id
        WHERE pd.prescription_id = $1`,
@@ -44,7 +63,7 @@ exports.getPrescriptionById = async (req, res, next) => {
 
 exports.createPrescription = async (req, res, next) => {
   try {
-    const { patientId, doctorId, branchId, diagnosis, notes, medicines } = req.body;
+    const { patientId, doctorId, prescriptionDate, medicines } = req.body;
     if (!patientId || !doctorId || !Array.isArray(medicines) || medicines.length === 0) {
       return sendError(res, 400, 'Patient, doctor, and at least one medicine are required.');
     }
@@ -59,16 +78,16 @@ exports.createPrescription = async (req, res, next) => {
         throw new Error('PATIENT_NOT_FOUND');
       }
 
-      const doctor = await client.query('SELECT doctor_id, branch_id FROM doctor WHERE doctor_id = $1', [doctorId]);
+      const doctor = await client.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1', [doctorId]);
       if (!doctor.rows.length) {
         throw new Error('DOCTOR_NOT_FOUND');
       }
 
       const prescriptionResult = await client.query(
-        `INSERT INTO prescription (patient_id, doctor_id, branch_id, diagnosis, notes)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO prescription (patient_id, doctor_id, prescription_date)
+         VALUES ($1, $2, COALESCE($3, CURRENT_DATE))
          RETURNING *`,
-        [patientId, doctorId, branchId || doctor.rows[0].branch_id || 1, diagnosis || null, notes || null]
+        [patientId, doctorId, prescriptionDate || null]
       );
 
       const prescription = prescriptionResult.rows[0];
@@ -77,7 +96,7 @@ exports.createPrescription = async (req, res, next) => {
           throw new Error('MEDICINE_ID_REQUIRED');
         }
 
-        const medCheck = await client.query('SELECT medicine_id, stock_quantity, status FROM medicine WHERE medicine_id = $1', [med.medicineId]);
+        const medCheck = await client.query('SELECT medicine_id FROM medicine WHERE medicine_id = $1', [med.medicineId]);
         if (!medCheck.rows.length) {
           throw new Error('MEDICINE_NOT_FOUND');
         }
@@ -88,9 +107,9 @@ exports.createPrescription = async (req, res, next) => {
         }
 
         await client.query(
-          `INSERT INTO prescription_detail (prescription_id, medicine_id, dosage, frequency, duration_days, quantity, instructions)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [prescription.prescription_id, med.medicineId, med.dosage || '', med.frequency || '', Number(med.durationDays || 1), quantity, med.instructions || '']
+          `INSERT INTO prescription_detail (prescription_id, medicine_id, dosage, quantity)
+           VALUES ($1, $2, $3, $4)`,
+          [prescription.prescription_id, med.medicineId, med.dosage || '', quantity]
         );
       }
 
@@ -116,13 +135,10 @@ exports.updatePrescription = async (req, res, next) => {
   try {
     const result = await db.query(
       `UPDATE prescription
-       SET diagnosis = COALESCE($1, diagnosis),
-           notes = COALESCE($2, notes),
-           status = COALESCE($3, status),
-           updated_at = NOW()
-       WHERE prescription_id = $4
+       SET prescription_date = COALESCE($1, prescription_date)
+       WHERE prescription_id = $2
        RETURNING *`,
-      [req.body.diagnosis, req.body.notes, req.body.status, req.params.id]
+      [req.body.prescriptionDate, req.params.id]
     );
 
     if (!result.rows.length) return sendError(res, 404, 'Prescription not found.');

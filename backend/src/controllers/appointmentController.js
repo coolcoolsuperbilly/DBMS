@@ -3,17 +3,19 @@ const { sendSuccess, sendError } = require('../utils/response');
 
 const mapAppointment = (row) => ({
   id: row.appointment_id,
+  appointmentId: row.appointment_id,
   patientId: row.patient_id,
   doctorId: row.doctor_id,
-  departmentId: row.department_id,
   branchId: row.branch_id,
   appointmentDate: row.appointment_date,
-  startTime: row.start_time,
-  endTime: row.end_time,
-  appointmentType: row.appointment_type,
+  appointmentTime: row.appointment_time,
+  startTime: row.appointment_time,
+  tokenNo: row.token_no,
   status: row.status,
-  notes: row.notes,
-  createdAt: row.created_at,
+  patientName: row.patient_name,
+  doctorName: row.doctor_name,
+  departmentName: row.department_name,
+  branchLocation: row.branch_location,
 });
 
 exports.getAppointments = async (req, res, next) => {
@@ -23,38 +25,34 @@ exports.getAppointments = async (req, res, next) => {
     const params = [];
 
     if (status) {
-      where = `${where ? ' AND ' : ' WHERE '} a.status = $${params.length + 1}`;
+      where = `${where ? where + ' AND ' : ' WHERE '} a.status = $${params.length + 1}`;
       params.push(status);
     }
 
     if (date) {
-      where = `${where ? ' AND ' : ' WHERE '} a.appointment_date = $${params.length + 1}`;
+      where = `${where ? where + ' AND ' : ' WHERE '} a.appointment_date = $${params.length + 1}`;
       params.push(date);
     }
 
     if (search) {
-      where = `${where ? ' AND ' : ' WHERE '} (lower(p.first_name || ' ' || COALESCE(p.last_name, '')) ILIKE $${params.length + 1} OR lower(d.doctor_name) ILIKE $${params.length + 1})`;
+      where = `${where ? where + ' AND ' : ' WHERE '} (lower(p.name) ILIKE $${params.length + 1} OR lower(d.name) ILIKE $${params.length + 1})`;
       params.push(`%${search}%`);
     }
 
     const result = await db.query(
-      `SELECT a.*, p.first_name, p.last_name, d.doctor_name, dep.department_name
+      `SELECT a.*, p.name AS patient_name, d.name AS doctor_name, dep.department_name, b.location AS branch_location
        FROM appointment a
        JOIN patient p ON p.patient_id = a.patient_id
        JOIN doctor d ON d.doctor_id = a.doctor_id
-       JOIN department dep ON dep.department_id = a.department_id
+       JOIN department dep ON dep.department_id = d.department_id
+       JOIN branch b ON b.branch_id = a.branch_id
        ${where}
-       ORDER BY a.appointment_date DESC, a.start_time DESC`,
+       ORDER BY a.appointment_date DESC, a.appointment_time DESC`,
       params
     );
 
     return sendSuccess(res, 200, {
-      appointments: result.rows.map((row) => ({
-        ...mapAppointment(row),
-        patientName: `${row.first_name}${row.last_name ? ` ${row.last_name}` : ''}`,
-        doctorName: row.doctor_name,
-        departmentName: row.department_name,
-      })),
+      appointments: result.rows.map(mapAppointment),
     });
   } catch (error) {
     next(error);
@@ -64,11 +62,12 @@ exports.getAppointments = async (req, res, next) => {
 exports.getAppointmentById = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT a.*, p.first_name, p.last_name, d.doctor_name, dep.department_name
+      `SELECT a.*, p.name AS patient_name, d.name AS doctor_name, dep.department_name, b.location AS branch_location
        FROM appointment a
        JOIN patient p ON p.patient_id = a.patient_id
        JOIN doctor d ON d.doctor_id = a.doctor_id
-       JOIN department dep ON dep.department_id = a.department_id
+       JOIN department dep ON dep.department_id = d.department_id
+       JOIN branch b ON b.branch_id = a.branch_id
        WHERE a.appointment_id = $1`,
       [req.params.id]
     );
@@ -77,7 +76,7 @@ exports.getAppointmentById = async (req, res, next) => {
       return sendError(res, 404, 'Appointment not found.');
     }
 
-    return sendSuccess(res, 200, { appointment: result.rows[0] });
+    return sendSuccess(res, 200, { appointment: mapAppointment(result.rows[0]) });
   } catch (error) {
     next(error);
   }
@@ -85,67 +84,78 @@ exports.getAppointmentById = async (req, res, next) => {
 
 exports.createAppointment = async (req, res, next) => {
   try {
-    const { patientId, doctorId, departmentId, branchId, appointmentDate, startTime, endTime, appointmentType, status, notes } = req.body;
-    if (!patientId || !doctorId || !departmentId || !branchId || !appointmentDate || !startTime || !endTime) {
-      return sendError(res, 400, 'Patient, doctor, branch, department, date, start time and end time are required.');
+    const patientId = req.body.patientId || req.body.patient_id;
+    const doctorId = req.body.doctorId || req.body.doctor_id;
+    let branchId = req.body.branchId || req.body.branch_id;
+    const appointmentDate = req.body.appointmentDate || req.body.appointment_date;
+    const appointmentTime = req.body.appointmentTime || req.body.appointment_time || req.body.startTime || req.body.start_time;
+    let tokenNo = req.body.tokenNo || req.body.token_no;
+    const status = req.body.status || 'pending';
+
+    if (!patientId || !doctorId || !appointmentDate || !appointmentTime) {
+      return sendError(res, 400, 'Patient, doctor, appointment date and appointment time are required.');
     }
 
-    const patient = await db.query('SELECT patient_id, status FROM patient WHERE patient_id = $1', [patientId]);
-    if (!patient.rows.length) {
-      return sendError(res, 404, 'Patient not found.');
+    // Auto-derive branchId from doctor's primary department if not supplied
+    if (!branchId) {
+      const docDept = await db.query(
+        `SELECT dep.branch_id
+         FROM doctor d
+         JOIN department dep ON dep.department_id = d.department_id
+         WHERE d.doctor_id = $1`,
+        [doctorId]
+      );
+      if (docDept.rows.length) {
+        branchId = docDept.rows[0].branch_id;
+      } else {
+        return sendError(res, 400, 'Doctor does not belong to any valid department/branch.');
+      }
     }
 
-    const doctor = await db.query(
-      'SELECT doctor_id, branch_id, department_id, status FROM doctor WHERE doctor_id = $1',
-      [doctorId]
-    );
-    if (!doctor.rows.length) {
-      return sendError(res, 404, 'Doctor not found.');
-    }
-    const doctorRow = doctor.rows[0];
-    if (Number(branchId) !== Number(doctorRow.branch_id) || Number(departmentId) !== Number(doctorRow.department_id)) {
-      return sendError(res, 400, 'Selected doctor does not belong to the chosen branch and department.');
-    }
-    if (doctorRow.status === 'inactive' || doctorRow.status === 'off_duty') {
-      return sendError(res, 400, 'Doctor is not available for appointments.');
+    // Auto-generate sequential token number for this branch and date if not provided
+    if (!tokenNo) {
+      const tokenRes = await db.query(
+        `SELECT COALESCE(MAX(token_no), 0) + 1 AS next_token
+         FROM appointment
+         WHERE branch_id = $1 AND appointment_date = $2`,
+        [branchId, appointmentDate]
+      );
+      tokenNo = tokenRes.rows[0].next_token;
     }
 
-    const branch = await db.query('SELECT branch_id, status FROM branch WHERE branch_id = $1', [branchId]);
-    if (!branch.rows.length || branch.rows[0].status !== 'active') {
-      return sendError(res, 400, 'Branch is inactive or not found.');
-    }
-
-    const department = await db.query('SELECT department_id, status FROM department WHERE department_id = $1', [departmentId]);
-    if (!department.rows.length || department.rows[0].status !== 'active') {
-      return sendError(res, 400, 'Department is inactive or not found.');
-    }
-
-    if (startTime >= endTime) {
-      return sendError(res, 400, 'End time must be later than start time.');
-    }
-
-    const overlap = await db.query(
-      `SELECT appointment_id FROM appointment
-       WHERE doctor_id = $1
-         AND appointment_date = $2
-         AND status IN ('pending','confirmed')
-         AND start_time < $3
-         AND end_time > $4`,
-      [doctorId, appointmentDate, endTime, startTime]
-    );
-    if (overlap.rows.length) {
-      return sendError(res, 409, 'Doctor is already booked for the selected time slot.');
-    }
-
+    // The DB trigger check_appointment_rules and exclusion constraint enforce BCNF rules
     const result = await db.query(
-      `INSERT INTO appointment (patient_id, doctor_id, department_id, branch_id, appointment_date, start_time, end_time, appointment_type, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'consultation'), COALESCE($9, 'pending'), $10)
+      `INSERT INTO appointment (patient_id, doctor_id, branch_id, appointment_date, appointment_time, token_no, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [patientId, doctorId, departmentId, branchId, appointmentDate, startTime, endTime, appointmentType, status, notes || null]
+      [patientId, doctorId, branchId, appointmentDate, appointmentTime, tokenNo, status]
     );
 
-    return sendSuccess(res, 201, { appointment: result.rows[0] });
+    const full = await db.query(
+      `SELECT a.*, p.name AS patient_name, d.name AS doctor_name, dep.department_name, b.location AS branch_location
+       FROM appointment a
+       JOIN patient p ON p.patient_id = a.patient_id
+       JOIN doctor d ON d.doctor_id = a.doctor_id
+       JOIN department dep ON dep.department_id = d.department_id
+       JOIN branch b ON b.branch_id = a.branch_id
+       WHERE a.appointment_id = $1`,
+      [result.rows[0].appointment_id]
+    );
+
+    return sendSuccess(res, 201, { appointment: mapAppointment(full.rows[0] || result.rows[0]) });
   } catch (error) {
+    if (error.code === '23P01') {
+      return sendError(res, 409, 'Doctor is already booked for this time slot (schedule conflict).', 'exclusion_violation');
+    }
+    if (error.code === '23505') {
+      return sendError(res, 409, 'Appointment token or slot conflict for this date.', 'duplicate_record');
+    }
+    if (error.message && error.message.toLowerCase().includes('overlap')) {
+      return sendError(res, 409, error.message, 'overlap_conflict');
+    }
+    if (error.message && error.message.includes('RAISE')) {
+      return sendError(res, 400, error.message);
+    }
     next(error);
   }
 };
@@ -157,69 +167,59 @@ exports.updateAppointment = async (req, res, next) => {
       return sendError(res, 404, 'Appointment not found.');
     }
 
-    const patientId = req.body.patientId ?? current.rows[0].patient_id;
-    const doctorId = req.body.doctorId ?? current.rows[0].doctor_id;
-    const departmentId = req.body.departmentId ?? current.rows[0].department_id;
-    const branchId = req.body.branchId ?? current.rows[0].branch_id;
-    const appointmentDate = req.body.appointmentDate ?? current.rows[0].appointment_date;
-    const startTime = req.body.startTime ?? current.rows[0].start_time;
-    const endTime = req.body.endTime ?? current.rows[0].end_time;
-
-    if (startTime >= endTime) {
-      return sendError(res, 400, 'End time must be later than start time.');
-    }
-
-    const doctor = await db.query('SELECT doctor_id, branch_id, department_id, status FROM doctor WHERE doctor_id = $1', [doctorId]);
-    if (!doctor.rows.length) {
-      return sendError(res, 404, 'Doctor not found.');
-    }
-    if (Number(branchId) !== Number(doctor.rows[0].branch_id) || Number(departmentId) !== Number(doctor.rows[0].department_id)) {
-      return sendError(res, 400, 'Selected doctor does not belong to the chosen branch and department.');
-    }
-
-    const overlap = await db.query(
-      `SELECT appointment_id FROM appointment
-       WHERE doctor_id = $1 AND appointment_date = $2 AND appointment_id <> $3
-         AND status IN ('pending','confirmed')
-         AND start_time < $4 AND end_time > $5`,
-      [doctorId, appointmentDate, req.params.id, endTime, startTime]
-    );
-    if (overlap.rows.length) {
-      return sendError(res, 409, 'Doctor is already booked for the selected time slot.');
-    }
+    const patientId = req.body.patientId || req.body.patient_id;
+    const doctorId = req.body.doctorId || req.body.doctor_id;
+    const branchId = req.body.branchId || req.body.branch_id;
+    const appointmentDate = req.body.appointmentDate || req.body.appointment_date;
+    const appointmentTime = req.body.appointmentTime || req.body.appointment_time || req.body.startTime || req.body.start_time;
+    const tokenNo = req.body.tokenNo || req.body.token_no;
+    const status = req.body.status;
 
     const result = await db.query(
       `UPDATE appointment
        SET patient_id = COALESCE($1, patient_id),
            doctor_id = COALESCE($2, doctor_id),
-           department_id = COALESCE($3, department_id),
-           branch_id = COALESCE($4, branch_id),
-           appointment_date = COALESCE($5, appointment_date),
-           start_time = COALESCE($6, start_time),
-           end_time = COALESCE($7, end_time),
-           appointment_type = COALESCE($8, appointment_type),
-           status = COALESCE($9, status),
-           notes = COALESCE($10, notes),
-           updated_at = NOW()
-       WHERE appointment_id = $11
+           branch_id = COALESCE($3, branch_id),
+           appointment_date = COALESCE($4, appointment_date),
+           appointment_time = COALESCE($5, appointment_time),
+           token_no = COALESCE($6, token_no),
+           status = COALESCE($7, status)
+       WHERE appointment_id = $8
        RETURNING *`,
       [
         patientId,
         doctorId,
-        departmentId,
         branchId,
         appointmentDate,
-        startTime,
-        endTime,
-        req.body.appointmentType,
-        req.body.status,
-        req.body.notes,
+        appointmentTime,
+        tokenNo,
+        status,
         req.params.id,
       ]
     );
 
-    return sendSuccess(res, 200, { appointment: result.rows[0] });
+    const full = await db.query(
+      `SELECT a.*, p.name AS patient_name, d.name AS doctor_name, dep.department_name, b.location AS branch_location
+       FROM appointment a
+       JOIN patient p ON p.patient_id = a.patient_id
+       JOIN doctor d ON d.doctor_id = a.doctor_id
+       JOIN department dep ON dep.department_id = d.department_id
+       JOIN branch b ON b.branch_id = a.branch_id
+       WHERE a.appointment_id = $1`,
+      [result.rows[0].appointment_id]
+    );
+
+    return sendSuccess(res, 200, { appointment: mapAppointment(full.rows[0] || result.rows[0]) });
   } catch (error) {
+    if (error.code === '23P01') {
+      return sendError(res, 409, 'Doctor is already booked for this time slot (schedule conflict).', 'exclusion_violation');
+    }
+    if (error.message && error.message.toLowerCase().includes('overlap')) {
+      return sendError(res, 409, error.message, 'overlap_conflict');
+    }
+    if (error.message && error.message.includes('RAISE')) {
+      return sendError(res, 400, error.message);
+    }
     next(error);
   }
 };

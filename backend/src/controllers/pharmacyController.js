@@ -3,7 +3,18 @@ const { sendSuccess, sendError } = require('../utils/response');
 
 exports.getPharmacies = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM pharmacy ORDER BY pharmacy_id DESC');
+    const result = await db.query(
+      `SELECT p.*,
+              CONCAT('Pharmacy Branch ', p.branch_id) AS pharmacy_name,
+              CONCAT('Pharmacy Branch ', p.branch_id) AS name,
+              b.location,
+              b.location AS address,
+              b.location AS branch_location,
+              'active' AS status
+       FROM pharmacy p
+       JOIN branch b ON b.branch_id = p.branch_id
+       ORDER BY p.pharmacy_id DESC`
+    );
     return sendSuccess(res, 200, { pharmacies: result.rows });
   } catch (error) {
     next(error);
@@ -13,11 +24,16 @@ exports.getPharmacies = async (req, res, next) => {
 exports.getInventory = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT pi.*, m.medicine_name, m.category, m.unit_price
+      `SELECT pi.*,
+              pi.stock_quantity AS quantity,
+              pi.price AS unit_price,
+              m.name AS medicine_name,
+              'General' AS category,
+              CURRENT_DATE AS last_updated
        FROM pharmacy_inventory pi
        JOIN medicine m ON m.medicine_id = pi.medicine_id
        WHERE pi.pharmacy_id = $1
-       ORDER BY m.medicine_name`,
+       ORDER BY m.name`,
       [req.params.id]
     );
     return sendSuccess(res, 200, { inventory: result.rows });
@@ -28,8 +44,10 @@ exports.getInventory = async (req, res, next) => {
 
 exports.addInventory = async (req, res, next) => {
   try {
-    const { medicineId, quantity, reorderLevel } = req.body;
-    if (!medicineId || quantity === undefined || quantity < 0) return sendError(res, 400, 'Medicine and a valid non-negative quantity are required.');
+    const { medicineId, stockQuantity, price, reorderLevel } = req.body;
+    if (!medicineId || stockQuantity === undefined || price === undefined) {
+      return sendError(res, 400, 'Medicine, stock quantity and price are required.');
+    }
 
     const pharmacy = await db.query('SELECT pharmacy_id FROM pharmacy WHERE pharmacy_id = $1', [req.params.id]);
     if (!pharmacy.rows.length) {
@@ -37,14 +55,14 @@ exports.addInventory = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `INSERT INTO pharmacy_inventory (pharmacy_id, medicine_id, quantity, reorder_level)
-       VALUES ($1, $2, $3, COALESCE($4, 0))
+      `INSERT INTO pharmacy_inventory (pharmacy_id, medicine_id, stock_quantity, price, reorder_level)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 0))
        ON CONFLICT (pharmacy_id, medicine_id)
-       DO UPDATE SET quantity = pharmacy_inventory.quantity + EXCLUDED.quantity,
-                    reorder_level = COALESCE(EXCLUDED.reorder_level, pharmacy_inventory.reorder_level),
-                    last_updated = NOW()
+       DO UPDATE SET stock_quantity = pharmacy_inventory.stock_quantity + EXCLUDED.stock_quantity,
+                    price = EXCLUDED.price,
+                    reorder_level = COALESCE(EXCLUDED.reorder_level, pharmacy_inventory.reorder_level)
        RETURNING *`,
-      [req.params.id, medicineId, Number(quantity), Number(reorderLevel || 0)]
+      [req.params.id, medicineId, Number(stockQuantity), Number(price), Number(reorderLevel || 0)]
     );
 
     return sendSuccess(res, 201, { inventory: result.rows[0] });
@@ -55,14 +73,41 @@ exports.addInventory = async (req, res, next) => {
 
 exports.updateInventory = async (req, res, next) => {
   try {
-    const { quantity, reorderLevel, action } = req.body;
-    if (quantity === undefined && reorderLevel === undefined) {
-      return sendError(res, 400, 'Provide a quantity or reorder level to update.');
-    }
+    const { stockQuantity, price, reorderLevel, action } = req.body;
 
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
+
+      const qty = req.body.quantity !== undefined ? req.body.quantity : stockQuantity;
+
+      if (action === 'dispense' || action === 'deduct') {
+        if (qty === undefined || Number(qty) <= 0) {
+          await client.query('ROLLBACK');
+          return sendError(res, 400, 'Dispensed quantity must be greater than zero.');
+        }
+
+        try {
+          // Use the schema's built-in dispense_medicine function
+          const dispensed = await client.query(
+            'SELECT dispense_medicine($1, $2, $3) AS remaining_stock',
+            [req.params.id, req.params.medicineId, Number(qty)]
+          );
+          await client.query('COMMIT');
+          return sendSuccess(res, 200, { remainingStock: dispensed.rows[0].remaining_stock });
+        } catch (funcErr) {
+          await client.query('ROLLBACK');
+          return sendError(res, 409, funcErr.message, 'insufficient_inventory');
+        }
+      }
+
+      // Normal update
+      const targetStock = stockQuantity !== undefined ? stockQuantity : req.body.quantity;
+      if (targetStock !== undefined && Number(targetStock) < 0) {
+        await client.query('ROLLBACK');
+        return sendError(res, 400, 'Stock quantity cannot be negative.');
+      }
+
       const current = await client.query(
         `SELECT * FROM pharmacy_inventory WHERE pharmacy_id = $1 AND medicine_id = $2 FOR UPDATE`,
         [req.params.id, req.params.medicineId]
@@ -73,40 +118,20 @@ exports.updateInventory = async (req, res, next) => {
         return sendError(res, 404, 'Inventory entry not found.');
       }
 
-      if (quantity !== undefined && Number(quantity) < 0) {
-        await client.query('ROLLBACK');
-        return sendError(res, 400, 'Quantity cannot be negative.');
-      }
-
-      if (reorderLevel !== undefined && Number(reorderLevel) < 0) {
-        await client.query('ROLLBACK');
-        return sendError(res, 400, 'Reorder level cannot be negative.');
-      }
-
-      const currentQty = Number(current.rows[0].quantity || 0);
-      const requestedQty = quantity !== undefined ? Number(quantity) : currentQty;
-      let finalQty = currentQty;
-
-      if (action === 'deduct') {
-        finalQty = currentQty - requestedQty;
-      } else if (quantity !== undefined) {
-        finalQty = requestedQty;
-      }
-
-      if (finalQty < 0) {
-        await client.query('ROLLBACK');
-        return sendError(res, 409, 'Insufficient stock in inventory.');
-      }
-
       const result = await client.query(
         `UPDATE pharmacy_inventory
-         SET quantity = $1,
-             reorder_level = COALESCE($2, reorder_level),
-             last_updated = NOW(),
-             updated_at = NOW()
-         WHERE pharmacy_id = $3 AND medicine_id = $4
+         SET stock_quantity = COALESCE($1, stock_quantity),
+             price = COALESCE($2, price),
+             reorder_level = COALESCE($3, reorder_level)
+         WHERE pharmacy_id = $4 AND medicine_id = $5
          RETURNING *`,
-        [Math.max(finalQty, 0), reorderLevel !== undefined ? Number(reorderLevel) : current.rows[0].reorder_level, req.params.id, req.params.medicineId]
+        [
+          targetStock !== undefined ? Number(targetStock) : null,
+          price !== undefined ? Number(price) : null,
+          reorderLevel !== undefined ? Number(reorderLevel) : null,
+          req.params.id,
+          req.params.medicineId,
+        ]
       );
 
       await client.query('COMMIT');

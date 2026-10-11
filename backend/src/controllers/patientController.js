@@ -1,21 +1,31 @@
 const db = require('../config/db');
 const { sendSuccess, sendError } = require('../utils/response');
 
-const mapPatient = (row) => ({
-  id: row.patient_id,
-  name: `${row.first_name}${row.last_name ? ` ${row.last_name}` : ''}`,
-  firstName: row.first_name,
-  lastName: row.last_name,
-  dateOfBirth: row.date_of_birth,
-  gender: row.gender,
-  bloodGroup: row.blood_group,
-  phone: row.phone,
-  email: row.email,
-  address: row.address,
-  status: row.status,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
+const mapPatient = (row) => {
+  const parts = (row.name || '').trim().split(/\s+/);
+  const firstName = parts[0] || '';
+  const lastName = parts.slice(1).join(' ') || '';
+  const addressParts = [row.street, row.city, row.state, row.pin_code].filter(Boolean);
+
+  return {
+    id: row.patient_id,
+    patient_id: row.patient_id,
+    name: row.name,
+    firstName,
+    lastName,
+    dob: row.dob,
+    dateOfBirth: row.dob,
+    gender: row.gender,
+    street: row.street,
+    city: row.city,
+    state: row.state,
+    pinCode: row.pin_code,
+    pin_code: row.pin_code,
+    phone: row.phone,
+    contact: row.phone,
+    address: addressParts.join(', ') || null,
+  };
+};
 
 exports.getPatients = async (req, res, next) => {
   try {
@@ -24,7 +34,7 @@ exports.getPatients = async (req, res, next) => {
     const params = [];
 
     if (search) {
-      where = 'WHERE lower(first_name || \' \' || COALESCE(last_name, \'\')) ILIKE $1';
+      where = 'WHERE lower(name) ILIKE $1';
       params.push(`%${search}%`);
     }
 
@@ -55,27 +65,25 @@ exports.getPatientById = async (req, res, next) => {
 
 exports.createPatient = async (req, res, next) => {
   try {
-    const {
-      firstName,
-      lastName,
-      dateOfBirth,
-      gender,
-      bloodGroup,
-      phone,
-      email,
-      address,
-      status,
-    } = req.body;
+    const { name, dob, gender, street, city, state, pinCode, phone } = req.body;
+    const resolvedName = name || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ');
+    const resolvedDob = dob || req.body.dateOfBirth || null;
+    const resolvedGender = gender || null;
+    const resolvedStreet = street || req.body.address || null;
+    const resolvedCity = city || null;
+    const resolvedState = state || null;
+    const resolvedPin = pinCode || req.body.pin_code || null;
+    const resolvedPhone = phone || req.body.contact || null;
 
-    if (!firstName || !phone) {
-      return sendError(res, 400, 'Patient name and phone are required.');
+    if (!resolvedName) {
+      return sendError(res, 400, 'Patient name is required.');
     }
 
     const result = await db.query(
-      `INSERT INTO patient (first_name, last_name, date_of_birth, gender, blood_group, phone, email, address, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'active'))
+      `INSERT INTO patient (name, dob, gender, street, city, state, pin_code, phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [firstName, lastName || null, dateOfBirth || null, gender || 'Other', bloodGroup || null, phone, email || null, address || null, status || 'active']
+      [resolvedName, resolvedDob, resolvedGender, resolvedStreet, resolvedCity, resolvedState, resolvedPin, resolvedPhone]
     );
 
     return sendSuccess(res, 201, { patient: mapPatient(result.rows[0]) });
@@ -86,37 +94,45 @@ exports.createPatient = async (req, res, next) => {
 
 exports.updatePatient = async (req, res, next) => {
   try {
+    const current = await db.query('SELECT * FROM patient WHERE patient_id = $1', [req.params.id]);
+    if (!current.rows.length) {
+      return sendError(res, 404, 'Patient not found.');
+    }
+
+    let resolvedName = req.body.name;
+    if (!resolvedName && (req.body.firstName || req.body.lastName)) {
+      resolvedName = [req.body.firstName, req.body.lastName].filter(Boolean).join(' ');
+    }
+
+    const resolvedDob = req.body.dob || req.body.dateOfBirth;
+    const resolvedStreet = req.body.street || req.body.address;
+    const resolvedPin = req.body.pinCode || req.body.pin_code;
+    const resolvedPhone = req.body.phone || req.body.contact;
+
     const result = await db.query(
       `UPDATE patient
-       SET first_name = COALESCE($1, first_name),
-           last_name = COALESCE($2, last_name),
-           date_of_birth = COALESCE($3, date_of_birth),
-           gender = COALESCE($4, gender),
-           blood_group = COALESCE($5, blood_group),
-           phone = COALESCE($6, phone),
-           email = COALESCE($7, email),
-           address = COALESCE($8, address),
-           status = COALESCE($9, status),
-           updated_at = NOW()
-       WHERE patient_id = $10
+       SET name = COALESCE($1, name),
+           dob = COALESCE($2, dob),
+           gender = COALESCE($3, gender),
+           street = COALESCE($4, street),
+           city = COALESCE($5, city),
+           state = COALESCE($6, state),
+           pin_code = COALESCE($7, pin_code),
+           phone = COALESCE($8, phone)
+       WHERE patient_id = $9
        RETURNING *`,
       [
-        req.body.firstName,
-        req.body.lastName,
-        req.body.dateOfBirth || null,
+        resolvedName,
+        resolvedDob || null,
         req.body.gender,
-        req.body.bloodGroup,
-        req.body.phone,
-        req.body.email,
-        req.body.address,
-        req.body.status,
+        resolvedStreet,
+        req.body.city,
+        req.body.state,
+        resolvedPin,
+        resolvedPhone,
         req.params.id,
       ]
     );
-
-    if (!result.rows.length) {
-      return sendError(res, 404, 'Patient not found.');
-    }
 
     return sendSuccess(res, 200, { patient: mapPatient(result.rows[0]) });
   } catch (error) {

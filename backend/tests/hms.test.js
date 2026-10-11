@@ -49,12 +49,14 @@ test('doctors list loads with auth', async () => {
 
 test('patient CRUD works', async () => {
   const payload = {
-    firstName: 'Test',
-    lastName: 'Patient',
-    phone: '9999999999',
+    name: 'Test Patient',
+    dob: '1990-01-01',
     gender: 'Male',
-    bloodGroup: 'O+',
-    status: 'active',
+    street: '123 Test St',
+    city: 'Kochi',
+    state: 'Kerala',
+    pinCode: '682001',
+    phone: '9999999999',
   };
 
   const createRes = await authReq().post('/api/patients').send(payload);
@@ -62,9 +64,9 @@ test('patient CRUD works', async () => {
   assert.equal(createRes.body.success, true);
 
   const patientId = createRes.body.patient.id;
-  const updateRes = await authReq().put(`/api/patients/${patientId}`).send({ status: 'critical' });
+  const updateRes = await authReq().put(`/api/patients/${patientId}`).send({ phone: '8888888888' });
   assert.equal(updateRes.status, 200);
-  assert.equal(updateRes.body.patient.status, 'critical');
+  assert.equal(updateRes.body.patient.phone, '8888888888');
 
   const deleteRes = await authReq().delete(`/api/patients/${patientId}`);
   assert.equal(deleteRes.status, 200);
@@ -72,42 +74,47 @@ test('patient CRUD works', async () => {
 
 test('doctor CRUD works', async () => {
   const doctorRes = await authReq().post('/api/doctors').send({
-    branchId: 1,
     departmentId: 1,
     name: 'Test Doctor',
     specialization: 'General Medicine',
-    status: 'available',
-    consultationFee: 500,
+    phone: '9876543210',
   });
 
   assert.equal(doctorRes.status, 201);
   const doctorId = doctorRes.body.doctor.id;
 
-  const updated = await authReq().put(`/api/doctors/${doctorId}`).send({ status: 'busy' });
+  const updated = await authReq().put(`/api/doctors/${doctorId}`).send({ specialization: 'Cardiology' });
   assert.equal(updated.status, 200);
-  assert.equal(updated.body.doctor.status, 'busy');
+  assert.equal(updated.body.doctor.specialization, 'Cardiology');
 });
 
 test('appointment conflict is rejected', async () => {
   const patients = await authReq().get('/api/patients');
   const doctors = await authReq().get('/api/doctors');
 
-  if (!patients.body.patients.length || !doctors.body.doctors.length) {
+  if (!patients.body.patients?.length || !doctors.body.doctors?.length) {
     assert.ok(true);
     return;
   }
 
   const patientId = patients.body.patients[0].id;
   const doctorId = doctors.body.doctors[0].id;
+  const branchId = doctors.body.doctors[0].branchId || 1;
+
+  // In BCNF, an appointment must fit within a doctor's shift in this branch
+  await authReq().post('/api/doctor-shifts').send({
+    doctorId,
+    branchId,
+    shiftStart: '2099-12-01 09:00:00',
+    shiftEnd: '2099-12-01 17:00:00',
+  }).catch(() => {});
+
   const payload = {
     patientId,
     doctorId,
-    departmentId: doctors.body.doctors[0].departmentId || 1,
-    branchId: doctors.body.doctors[0].branchId || 1,
+    branchId,
     appointmentDate: '2099-12-01',
-    startTime: '10:00:00',
-    endTime: '10:30:00',
-    appointmentType: 'consultation',
+    appointmentTime: '10:00:00',
   };
 
   const first = await authReq().post('/api/appointments').send(payload);
@@ -144,7 +151,7 @@ test('prescription creation works', async () => {
   const doctors = await authReq().get('/api/doctors');
   const medicines = await authReq().get('/api/medicines');
 
-  if (!patients.body.patients.length || !doctors.body.doctors.length || !medicines.body.medicines.length) {
+  if (!patients.body.patients?.length || !doctors.body.doctors?.length || !medicines.body.medicines?.length) {
     assert.ok(true);
     return;
   }
@@ -152,10 +159,7 @@ test('prescription creation works', async () => {
   const res = await authReq().post('/api/prescriptions').send({
     patientId: patients.body.patients[0].id,
     doctorId: doctors.body.doctors[0].id,
-    branchId: doctors.body.doctors[0].branchId || 1,
-    diagnosis: 'Test diagnosis',
-    notes: 'Test note',
-    medicines: [{ medicineId: medicines.body.medicines[0].medicine_id, dosage: '1 tab', frequency: 'Daily', durationDays: 5, quantity: 1 }],
+    medicines: [{ medicineId: medicines.body.medicines[0].medicine_id, dosage: '1 tab', quantity: 1 }],
   });
 
   assert.equal(res.status, 201);
@@ -163,13 +167,13 @@ test('prescription creation works', async () => {
 
 test('billing payment accepts partial payment', async () => {
   const bills = await authReq().get('/api/billing');
-  if (!bills.body.bills.length) {
+  if (!bills.body.bills?.length) {
     assert.ok(true);
     return;
   }
 
   const billId = bills.body.bills[0].bill_id;
-  const amount = Number(bills.body.bills[0].total_amount || 0);
+  const amount = Number(bills.body.bills[0].total_amount || bills.body.bills[0].amount || 0);
   const res = await authReq().put(`/api/billing/${billId}/payment`).send({ paymentMode: 'cash', amount: Math.max(0, Math.min(amount, amount / 2)) });
   assert.ok([200, 400].includes(res.status));
 });

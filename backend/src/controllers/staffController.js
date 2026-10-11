@@ -8,12 +8,16 @@ exports.getStaff = async (req, res, next) => {
     const params = [];
 
     if (search) {
-      where = `WHERE lower(staff_name) ILIKE $${params.length + 1}`;
+      where = `WHERE lower(s.name) ILIKE $${params.length + 1}`;
       params.push(`%${search}%`);
     }
 
     const result = await db.query(
-      `SELECT * FROM staff ${where} ORDER BY staff_id DESC`,
+      `SELECT s.*, b.location AS branch_location
+       FROM staff s
+       JOIN branch b ON b.branch_id = s.branch_id
+       ${where}
+       ORDER BY s.staff_id DESC`,
       params
     );
 
@@ -25,7 +29,13 @@ exports.getStaff = async (req, res, next) => {
 
 exports.getStaffById = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM staff WHERE staff_id = $1', [req.params.id]);
+    const result = await db.query(
+      `SELECT s.*, b.location AS branch_location
+       FROM staff s
+       JOIN branch b ON b.branch_id = s.branch_id
+       WHERE s.staff_id = $1`,
+      [req.params.id]
+    );
     if (!result.rows.length) return sendError(res, 404, 'Staff member not found.');
     return sendSuccess(res, 200, { staff: result.rows[0] });
   } catch (error) {
@@ -35,14 +45,14 @@ exports.getStaffById = async (req, res, next) => {
 
 exports.createStaff = async (req, res, next) => {
   try {
-    const { branchId, departmentId, name, role, phone, email, status } = req.body;
-    if (!name || !role) return sendError(res, 400, 'Staff name and role are required.');
+    const { name, role, shift, branchId } = req.body;
+    if (!name || !role || !branchId) return sendError(res, 400, 'Staff name, role and branch are required.');
 
     const result = await db.query(
-      `INSERT INTO staff (branch_id, department_id, staff_name, role, phone, email, status)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'active'))
+      `INSERT INTO staff (name, role, shift, branch_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [branchId || 1, departmentId || 1, name, role, phone || null, email || null, status || 'active']
+      [name, role, shift || null, branchId]
     );
 
     return sendSuccess(res, 201, { staff: result.rows[0] });
@@ -55,17 +65,13 @@ exports.updateStaff = async (req, res, next) => {
   try {
     const result = await db.query(
       `UPDATE staff
-       SET branch_id = COALESCE($1, branch_id),
-           department_id = COALESCE($2, department_id),
-           staff_name = COALESCE($3, staff_name),
-           role = COALESCE($4, role),
-           phone = COALESCE($5, phone),
-           email = COALESCE($6, email),
-           status = COALESCE($7, status),
-           updated_at = NOW()
-       WHERE staff_id = $8
+       SET name = COALESCE($1, name),
+           role = COALESCE($2, role),
+           shift = COALESCE($3, shift),
+           branch_id = COALESCE($4, branch_id)
+       WHERE staff_id = $5
        RETURNING *`,
-      [req.body.branchId, req.body.departmentId, req.body.name, req.body.role, req.body.phone, req.body.email, req.body.status, req.params.id]
+      [req.body.name, req.body.role, req.body.shift, req.body.branchId, req.params.id]
     );
 
     if (!result.rows.length) return sendError(res, 404, 'Staff member not found.');

@@ -7,6 +7,7 @@ const router = express.Router();
 router.get('/', protect, authorize('ADMIN','STAFF','DOCTOR','NURSE'), getRooms);
 router.get('/available', protect, authorize('ADMIN','STAFF','DOCTOR','NURSE'), getAvailableRooms);
 router.post('/', protect, authorize('ADMIN','STAFF'), createRoom);
+router.put('/:branchId/:roomNo', protect, authorize('ADMIN','STAFF'), updateRoom);
 router.put('/:id', protect, authorize('ADMIN','STAFF'), updateRoom);
 
 module.exports = router;

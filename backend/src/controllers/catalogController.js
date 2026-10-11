@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { sendSuccess, sendError } = require('../utils/response');
 
+// ---- Branches ----
 exports.getBranches = async (req, res, next) => {
   try {
     const { search, status } = req.query;
@@ -13,12 +14,19 @@ exports.getBranches = async (req, res, next) => {
     }
 
     if (search) {
-      where += `${where ? ' AND ' : ' WHERE '} lower(branch_name) ILIKE $${params.length + 1}`;
+      where += `${where ? ' AND ' : ' WHERE '} lower(location) ILIKE $${params.length + 1}`;
       params.push(`%${search}%`);
     }
 
     const result = await db.query(`SELECT * FROM branch ${where} ORDER BY branch_id DESC`, params);
-    return sendSuccess(res, 200, { branches: result.rows });
+    return sendSuccess(res, 200, {
+      branches: result.rows.map((b) => ({
+        ...b,
+        id: b.branch_id,
+        name: b.location,
+        branch_name: b.location,
+      })),
+    });
   } catch (error) {
     next(error);
   }
@@ -26,13 +34,14 @@ exports.getBranches = async (req, res, next) => {
 
 exports.createBranch = async (req, res, next) => {
   try {
-    const { branchName, address, phone, email, status } = req.body;
-    if (!branchName) return sendError(res, 400, 'Branch name is required.');
+    const location = req.body.location || req.body.branchName || req.body.branch_name || req.body.name;
+    const status = req.body.status || 'active';
+    if (!location) return sendError(res, 400, 'Branch location is required.');
 
     const result = await db.query(
-      `INSERT INTO branch (branch_name, address, phone, email, status)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'active')) RETURNING *`,
-      [branchName, address || null, phone || null, email || null, status || 'active']
+      `INSERT INTO branch (location, status)
+       VALUES ($1, COALESCE($2, 'active')) RETURNING *`,
+      [location, status]
     );
 
     return sendSuccess(res, 201, { branch: result.rows[0] });
@@ -41,6 +50,7 @@ exports.createBranch = async (req, res, next) => {
   }
 };
 
+// ---- Departments ----
 exports.getDepartments = async (req, res, next) => {
   try {
     const { branchId, search } = req.query;
@@ -58,7 +68,7 @@ exports.getDepartments = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `SELECT d.*, b.branch_name
+      `SELECT d.*, b.location AS branch_location, b.location AS branch_name
        FROM department d
        JOIN branch b ON b.branch_id = d.branch_id
        ${where}
@@ -66,7 +76,13 @@ exports.getDepartments = async (req, res, next) => {
       params
     );
 
-    return sendSuccess(res, 200, { departments: result.rows });
+    return sendSuccess(res, 200, {
+      departments: result.rows.map((d) => ({
+        ...d,
+        id: d.department_id,
+        name: d.department_name,
+      })),
+    });
   } catch (error) {
     next(error);
   }
@@ -74,13 +90,15 @@ exports.getDepartments = async (req, res, next) => {
 
 exports.createDepartment = async (req, res, next) => {
   try {
-    const { branchId, departmentName, description, status } = req.body;
+    const branchId = req.body.branchId || req.body.branch_id;
+    const departmentName = req.body.departmentName || req.body.department_name;
+    const status = req.body.status || 'active';
     if (!branchId || !departmentName) return sendError(res, 400, 'Branch and department name are required.');
 
     const result = await db.query(
-      `INSERT INTO department (branch_id, department_name, description, status)
-       VALUES ($1, $2, $3, COALESCE($4, 'active')) RETURNING *`,
-      [branchId, departmentName, description || null, status || 'active']
+      `INSERT INTO department (branch_id, department_name, status)
+       VALUES ($1, $2, COALESCE($3, 'active')) RETURNING *`,
+      [branchId, departmentName, status]
     );
 
     return sendSuccess(res, 201, { department: result.rows[0] });
@@ -89,29 +107,30 @@ exports.createDepartment = async (req, res, next) => {
   }
 };
 
+// ---- Nurses ----
 exports.getNurses = async (req, res, next) => {
   try {
-    const { departmentId, branchId, search } = req.query;
+    const { branchId, search } = req.query;
     let where = '';
     const params = [];
 
-    if (departmentId) {
-      where += `${where ? ' AND ' : ' WHERE '} n.department_id = $${params.length + 1}`;
-      params.push(departmentId);
-    }
     if (branchId) {
       where += `${where ? ' AND ' : ' WHERE '} n.branch_id = $${params.length + 1}`;
       params.push(branchId);
     }
     if (search) {
-      where += `${where ? ' AND ' : ' WHERE '} lower(n.nurse_name) ILIKE $${params.length + 1}`;
+      where += `${where ? ' AND ' : ' WHERE '} lower(n.name) ILIKE $${params.length + 1}`;
       params.push(`%${search}%`);
     }
 
     const result = await db.query(
-      `SELECT n.*, d.department_name, b.branch_name
+      `SELECT n.*,
+              n.nurse_id AS id,
+              n.name AS nurse_name,
+              b.location AS branch_location,
+              'General' AS department_name,
+              'active' AS status
        FROM nurse n
-       JOIN department d ON d.department_id = n.department_id
        JOIN branch b ON b.branch_id = n.branch_id
        ${where}
        ORDER BY n.nurse_id DESC`,
@@ -126,24 +145,33 @@ exports.getNurses = async (req, res, next) => {
 
 exports.createNurse = async (req, res, next) => {
   try {
-    const { branchId, departmentId, nurseName, phone, email, status } = req.body;
-    if (!branchId || !departmentId || !nurseName) return sendError(res, 400, 'Branch, department and nurse name are required.');
+    const branchId = req.body.branchId || req.body.branch_id || 1;
+    const name = req.body.name || req.body.nurseName;
+    const shift = req.body.shift || 'day';
+    if (!name) return sendError(res, 400, 'Nurse name is required.');
 
     const result = await db.query(
-      `INSERT INTO nurse (branch_id, department_id, nurse_name, phone, email, status)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'active')) RETURNING *`,
-      [branchId, departmentId, nurseName, phone || null, email || null, status || 'active']
+      `INSERT INTO nurse (branch_id, name, shift)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [branchId, name, shift || null]
     );
 
-    return sendSuccess(res, 201, { nurse: result.rows[0] });
+    return sendSuccess(res, 201, {
+      nurse: {
+        ...result.rows[0],
+        id: result.rows[0].nurse_id,
+        nurse_name: name,
+      },
+    });
   } catch (error) {
     next(error);
   }
 };
 
+// ---- Admissions ----
 exports.getAdmissions = async (req, res, next) => {
   try {
-    const { patientId, status } = req.query;
+    const { patientId, active } = req.query;
     let where = '';
     const params = [];
 
@@ -151,18 +179,24 @@ exports.getAdmissions = async (req, res, next) => {
       where += `${where ? ' AND ' : ' WHERE '} a.patient_id = $${params.length + 1}`;
       params.push(patientId);
     }
-    if (status) {
-      where += `${where ? ' AND ' : ' WHERE '} a.status = $${params.length + 1}`;
-      params.push(status);
+    if (active === 'true') {
+      where += `${where ? ' AND ' : ' WHERE '} a.discharge_date_time IS NULL`;
     }
 
     const result = await db.query(
-      `SELECT a.*, p.first_name, p.last_name, d.doctor_name, r.room_number, dep.department_name, b.branch_name
+      `SELECT a.*,
+              a.admission_id AS id,
+              a.room_no AS room_number,
+              a.room_no AS "roomNumber",
+              a.admit_date_time AS admission_date,
+              a.admit_date_time AS "admissionDate",
+              a.discharge_date_time AS discharge_date,
+              a.discharge_date_time AS "dischargeDate",
+              CASE WHEN a.discharge_date_time IS NULL THEN 'active' ELSE 'discharged' END AS status,
+              p.name AS patient_name,
+              b.location AS branch_location
        FROM admission a
        JOIN patient p ON p.patient_id = a.patient_id
-       JOIN doctor d ON d.doctor_id = a.doctor_id
-       JOIN room r ON r.room_id = a.room_id
-       JOIN department dep ON dep.department_id = a.department_id
        JOIN branch b ON b.branch_id = a.branch_id
        ${where}
        ORDER BY a.admission_id DESC`,
@@ -177,16 +211,25 @@ exports.getAdmissions = async (req, res, next) => {
 
 exports.createAdmission = async (req, res, next) => {
   try {
-    const { patientId, doctorId, roomId, branchId, departmentId, status, notes } = req.body;
-    if (!patientId || !doctorId || !roomId || !branchId || !departmentId) {
-      return sendError(res, 400, 'Patient, doctor, room, branch and department are required.');
+    const patientId = req.body.patientId || req.body.patient_id;
+    const roomNo = req.body.roomNo || req.body.room_no || req.body.roomNumber;
+    let branchId = req.body.branchId || req.body.branch_id;
+    const admitDateTime = req.body.admitDateTime || req.body.admissionDate || new Date();
+
+    if (!patientId || !roomNo) {
+      return sendError(res, 400, 'Patient and room number are required.');
+    }
+
+    if (!branchId) {
+      const roomBranch = await db.query('SELECT branch_id FROM room WHERE room_no = $1 LIMIT 1', [roomNo]);
+      branchId = roomBranch.rows[0]?.branch_id || 1;
     }
 
     const result = await db.query(
-      `INSERT INTO admission (patient_id, doctor_id, room_id, branch_id, department_id, status, notes)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'admitted'), $7)
+      `INSERT INTO admission (patient_id, branch_id, room_no, admit_date_time)
+       VALUES ($1, $2, $3, COALESCE($4, NOW()))
        RETURNING *`,
-      [patientId, doctorId, roomId, branchId, departmentId, status || 'admitted', notes || null]
+      [patientId, branchId, roomNo, admitDateTime]
     );
 
     return sendSuccess(res, 201, { admission: result.rows[0] });
@@ -195,14 +238,36 @@ exports.createAdmission = async (req, res, next) => {
   }
 };
 
+exports.updateAdmission = async (req, res, next) => {
+  try {
+    let dischargeDateTime = req.body.dischargeDateTime || req.body.dischargeDate;
+    if (!dischargeDateTime && req.body.status === 'discharged') {
+      dischargeDateTime = new Date();
+    }
+
+    const result = await db.query(
+      `UPDATE admission
+       SET discharge_date_time = COALESCE($1, discharge_date_time)
+       WHERE admission_id = $2
+       RETURNING *`,
+      [dischargeDateTime || new Date(), req.params.id]
+    );
+    if (!result.rows.length) return sendError(res, 404, 'Admission not found.');
+    return sendSuccess(res, 200, { admission: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---- Equipment ----
 exports.getEquipment = async (req, res, next) => {
   try {
-    const { theatreId, status } = req.query;
+    const { branchId, status } = req.query;
     let where = '';
     const params = [];
-    if (theatreId) {
-      where += `${where ? ' AND ' : ' WHERE '} e.theatre_id = $${params.length + 1}`;
-      params.push(theatreId);
+    if (branchId) {
+      where += `${where ? ' AND ' : ' WHERE '} e.branch_id = $${params.length + 1}`;
+      params.push(branchId);
     }
     if (status) {
       where += `${where ? ' AND ' : ' WHERE '} e.status = $${params.length + 1}`;
@@ -210,9 +275,15 @@ exports.getEquipment = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `SELECT e.*, ot.theatre_name
+      `SELECT e.*,
+              e.equipment_id AS id,
+              e.name AS equipment_name,
+              e.maintenance_date AS last_maintenance,
+              e.maintenance_date AS "lastMaintenance",
+              b.location AS branch_location,
+              'General' AS department_name
        FROM equipment e
-       JOIN operation_theatre ot ON ot.theatre_id = e.theatre_id
+       JOIN branch b ON b.branch_id = e.branch_id
        ${where}
        ORDER BY e.equipment_id DESC`,
       params
@@ -224,138 +295,19 @@ exports.getEquipment = async (req, res, next) => {
   }
 };
 
-exports.getShiftLogs = async (req, res, next) => {
-  try {
-    const { staffId, status } = req.query;
-    let where = '';
-    const params = [];
-    if (staffId) {
-      where += `${where ? ' AND ' : ' WHERE '} sl.staff_id = $${params.length + 1}`;
-      params.push(staffId);
-    }
-    if (status) {
-      where += `${where ? ' AND ' : ' WHERE '} sl.status = $${params.length + 1}`;
-      params.push(status);
-    }
-
-    const result = await db.query(
-      `SELECT sl.*, s.staff_name, b.branch_name
-       FROM shift_log sl
-       JOIN staff s ON s.staff_id = sl.staff_id
-       JOIN branch b ON b.branch_id = sl.branch_id
-       ${where}
-       ORDER BY sl.shift_date DESC, sl.start_time DESC`,
-      params
-    );
-
-    return sendSuccess(res, 200, { shifts: result.rows });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getPayStructures = async (req, res, next) => {
-  try {
-    const result = await db.query(
-      `SELECT ps.*, s.staff_name
-       FROM pay_structure ps
-       JOIN staff s ON s.staff_id = ps.staff_id
-       ORDER BY ps.pay_structure_id DESC`
-    );
-    return sendSuccess(res, 200, { payStructures: result.rows });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.createPayStructure = async (req, res, next) => {
-  try {
-    const { staffId, positionTitle, baseSalary, allowance, overtimeRate, effectiveFrom } = req.body;
-    if (!staffId || !positionTitle || !baseSalary) return sendError(res, 400, 'Staff, position title and base salary are required.');
-
-    const result = await db.query(
-      `INSERT INTO pay_structure (staff_id, position_title, base_salary, allowance, overtime_rate, effective_from)
-       VALUES ($1, $2, $3, COALESCE($4, 0), COALESCE($5, 0), COALESCE($6, CURRENT_DATE)) RETURNING *`,
-      [staffId, positionTitle, Number(baseSalary), Number(allowance || 0), Number(overtimeRate || 0), effectiveFrom || null]
-    );
-
-    return sendSuccess(res, 201, { payStructure: result.rows[0] });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getSalaries = async (req, res, next) => {
-  try {
-    const { staffId } = req.query;
-    let where = '';
-    const params = [];
-    if (staffId) {
-      where += `${where ? ' AND ' : ' WHERE '} s.staff_id = $${params.length + 1}`;
-      params.push(staffId);
-    }
-
-    const result = await db.query(
-      `SELECT sa.*, st.staff_name
-       FROM salary sa
-       JOIN staff st ON st.staff_id = sa.staff_id
-       ${where}
-       ORDER BY sa.pay_period_start DESC`,
-      params
-    );
-    return sendSuccess(res, 200, { salaries: result.rows });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.createSalary = async (req, res, next) => {
-  try {
-    const { staffId, payPeriodStart, payPeriodEnd, grossSalary, deductions, netSalary, status } = req.body;
-    if (!staffId || !payPeriodStart || !payPeriodEnd || !grossSalary) {
-      return sendError(res, 400, 'Staff, pay period and gross salary are required.');
-    }
-
-    const result = await db.query(
-      `INSERT INTO salary (staff_id, pay_period_start, pay_period_end, gross_salary, deductions, net_salary, status)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, $4), COALESCE($7, 'pending')) RETURNING *`,
-      [staffId, payPeriodStart, payPeriodEnd, Number(grossSalary), Number(deductions || 0), Number(netSalary || grossSalary), status || 'pending']
-    );
-
-    return sendSuccess(res, 201, { salary: result.rows[0] });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.updateAdmission = async (req, res, next) => {
-  try {
-    const { status, dischargeDate, notes } = req.body;
-    const result = await db.query(
-      `UPDATE admission
-       SET status = COALESCE($1, status),
-           discharge_date = COALESCE($2, discharge_date),
-           notes = COALESCE($3, notes),
-           updated_at = NOW()
-       WHERE admission_id = $4
-       RETURNING *`,
-      [status || null, dischargeDate || null, notes || null, req.params.id]
-    );
-    if (!result.rows.length) return sendError(res, 404, 'Admission not found.');
-    return sendSuccess(res, 200, { admission: result.rows[0] });
-  } catch (error) {
-    next(error);
-  }
-};
-
 exports.createEquipment = async (req, res, next) => {
   try {
-    const { theatreId, equipmentName, equipmentType, serialNumber, status } = req.body;
-    if (!theatreId || !equipmentName) return sendError(res, 400, 'Theatre and equipment name are required.');
+    const branchId = req.body.branchId || req.body.branch_id || 1;
+    const name = req.body.name || req.body.equipmentName;
+    const location = req.body.location || null;
+    const maintenanceDate = req.body.maintenanceDate || req.body.lastMaintenance || null;
+    const status = req.body.status || 'available';
+
+    if (!name) return sendError(res, 400, 'Equipment name is required.');
     const result = await db.query(
-      `INSERT INTO equipment (theatre_id, equipment_name, equipment_type, serial_number, status)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'active')) RETURNING *`,
-      [theatreId, equipmentName, equipmentType || 'general', serialNumber || null, status || 'active']
+      `INSERT INTO equipment (branch_id, name, location, maintenance_date, status)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'available')) RETURNING *`,
+      [branchId, name, location, maintenanceDate, status]
     );
     return sendSuccess(res, 201, { equipment: result.rows[0] });
   } catch (error) {
@@ -367,12 +319,12 @@ exports.updateEquipment = async (req, res, next) => {
   try {
     const result = await db.query(
       `UPDATE equipment
-       SET equipment_name = COALESCE($1, equipment_name),
-           status = COALESCE($2, status),
-           last_maintenance = COALESCE($3, last_maintenance),
-           updated_at = NOW()
-       WHERE equipment_id = $4 RETURNING *`,
-      [req.body.equipmentName || null, req.body.status || null, req.body.lastMaintenance || null, req.params.id]
+       SET name = COALESCE($1, name),
+           location = COALESCE($2, location),
+           maintenance_date = COALESCE($3, maintenance_date),
+           status = COALESCE($4, status)
+       WHERE equipment_id = $5 RETURNING *`,
+      [req.body.name || null, req.body.location || null, req.body.maintenanceDate || null, req.body.status || null, req.params.id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Equipment not found.');
     return sendSuccess(res, 200, { equipment: result.rows[0] });
@@ -381,14 +333,74 @@ exports.updateEquipment = async (req, res, next) => {
   }
 };
 
+// ---- Shift Logs ----
+exports.getShiftLogs = async (req, res, next) => {
+  try {
+    const { doctorId, nurseId, staffId, status } = req.query;
+    let where = '';
+    const params = [];
+    if (doctorId) {
+      where += `${where ? ' AND ' : ' WHERE '} sl.doctor_id = $${params.length + 1}`;
+      params.push(doctorId);
+    }
+    if (nurseId) {
+      where += `${where ? ' AND ' : ' WHERE '} sl.nurse_id = $${params.length + 1}`;
+      params.push(nurseId);
+    }
+    if (staffId) {
+      where += `${where ? ' AND ' : ' WHERE '} sl.staff_id = $${params.length + 1}`;
+      params.push(staffId);
+    }
+    if (status) {
+      where += `${where ? ' AND ' : ' WHERE '} sl.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    const result = await db.query(
+      `SELECT sl.*,
+              sl.shift_log_id AS id,
+              b.location AS branch_location,
+              b.location AS branch_name,
+              doc.name AS doctor_name,
+              n.name AS nurse_name,
+              COALESCE(st.name, doc.name, n.name, 'Staff Member') AS staff_name
+       FROM shift_log sl
+       JOIN branch b ON b.branch_id = sl.branch_id
+       LEFT JOIN doctor doc ON doc.doctor_id = sl.doctor_id
+       LEFT JOIN nurse n ON n.nurse_id = sl.nurse_id
+       LEFT JOIN staff st ON st.staff_id = sl.staff_id
+       ${where}
+       ORDER BY sl.shift_date DESC, sl.start_time DESC`,
+      params
+    );
+
+    return sendSuccess(res, 200, { shifts: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.createShiftLog = async (req, res, next) => {
   try {
-    const { staffId, branchId, shiftDate, shiftType, startTime, endTime, status, notes } = req.body;
-    if (!staffId || !branchId || !shiftDate) return sendError(res, 400, 'Staff, branch, and shift date are required.');
+    const branchId = req.body.branchId || req.body.branch_id || 1;
+    const doctorId = req.body.doctorId || req.body.doctor_id;
+    const nurseId = req.body.nurseId || req.body.nurse_id;
+    const staffId = req.body.staffId || req.body.staff_id;
+    const shiftDate = req.body.shiftDate || req.body.shift_date || new Date().toISOString().split('T')[0];
+    const startTime = req.body.startTime || req.body.start_time;
+    const endTime = req.body.endTime || req.body.end_time;
+    const status = req.body.status || 'scheduled';
+
+    if (!startTime || !endTime) {
+      return sendError(res, 400, 'Start and end times are required.');
+    }
+    // Exactly one of doctorId, nurseId, staffId must be set (enforced by DB CHECK)
+    const targetStaffId = staffId || (!doctorId && !nurseId ? 1 : null);
+
     const result = await db.query(
-      `INSERT INTO shift_log (staff_id, branch_id, shift_date, shift_type, start_time, end_time, status, notes)
-       VALUES ($1, $2, $3, COALESCE($4,'day'), $5, $6, COALESCE($7,'present'), $8) RETURNING *`,
-      [staffId, branchId, shiftDate, shiftType || 'day', startTime || null, endTime || null, status || 'present', notes || null]
+      `INSERT INTO shift_log (branch_id, doctor_id, nurse_id, staff_id, shift_date, start_time, end_time, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'scheduled')) RETURNING *`,
+      [branchId, doctorId || null, nurseId || null, targetStaffId, shiftDate, startTime, endTime, status]
     );
     return sendSuccess(res, 201, { shiftLog: result.rows[0] });
   } catch (error) {
@@ -396,16 +408,155 @@ exports.createShiftLog = async (req, res, next) => {
   }
 };
 
+// ---- Pay Structures ----
+exports.getPayStructures = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT ps.*,
+              ps.pay_structure_id AS id,
+              ps.employee_type AS role,
+              ps.employee_type AS position_title,
+              ps.base_pay AS base_salary,
+              ps.base_pay AS basic_salary,
+              ps.base_pay AS "basicSalary",
+              ps.allowance_rate AS allowance,
+              ps.allowance_rate AS allowances,
+              'Staff Position' AS staff_name
+       FROM pay_structure ps
+       ORDER BY ps.pay_structure_id DESC`
+    );
+    return sendSuccess(res, 200, { payStructures: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createPayStructure = async (req, res, next) => {
+  try {
+    const rawType = (req.body.employeeType || req.body.role || 'staff').toLowerCase();
+    const employeeType = ['doctor', 'nurse', 'staff'].includes(rawType) ? rawType : 'staff';
+    const basePay = req.body.basePay !== undefined ? req.body.basePay : req.body.basicSalary;
+    const allowanceRate = req.body.allowanceRate !== undefined ? req.body.allowanceRate : (req.body.allowances || req.body.hra || 0);
+    const status = req.body.status || 'active';
+
+    if (basePay === undefined) return sendError(res, 400, 'Base pay or basic salary is required.');
+
+    const result = await db.query(
+      `INSERT INTO pay_structure (employee_type, base_pay, allowance_rate, status)
+       VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, 'active')) RETURNING *`,
+      [employeeType, Number(basePay), Number(allowanceRate || 0), status]
+    );
+
+    return sendSuccess(res, 201, { payStructure: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---- Salaries ----
+exports.getSalaries = async (req, res, next) => {
+  try {
+    const { doctorId, nurseId, staffId } = req.query;
+    let where = '';
+    const params = [];
+    if (doctorId) {
+      where += `${where ? ' AND ' : ' WHERE '} sa.doctor_id = $${params.length + 1}`;
+      params.push(doctorId);
+    }
+    if (nurseId) {
+      where += `${where ? ' AND ' : ' WHERE '} sa.nurse_id = $${params.length + 1}`;
+      params.push(nurseId);
+    }
+    if (staffId) {
+      where += `${where ? ' AND ' : ' WHERE '} sa.staff_id = $${params.length + 1}`;
+      params.push(staffId);
+    }
+
+    const result = await db.query(
+      `SELECT sa.*,
+              sa.salary_id AS id,
+              TO_CHAR(sa.pay_month, 'YYYY-MM') AS month,
+              sa.base_pay_applied AS basic_salary,
+              sa.base_pay_applied AS "basicSalary",
+              sa.salary_amount AS net_salary,
+              sa.salary_amount AS "netSalary",
+              0 AS total_deductions,
+              0 AS deductions,
+              'paid' AS payment_status,
+              'paid' AS status,
+              doc.name AS doctor_name,
+              n.name AS nurse_name,
+              COALESCE(st.name, doc.name, n.name, 'Staff Member') AS staff_name
+       FROM salary sa
+       LEFT JOIN doctor doc ON doc.doctor_id = sa.doctor_id
+       LEFT JOIN nurse n ON n.nurse_id = sa.nurse_id
+       LEFT JOIN staff st ON st.staff_id = sa.staff_id
+       ${where}
+       ORDER BY sa.pay_month DESC`,
+      params
+    );
+    return sendSuccess(res, 200, { salaries: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createSalary = async (req, res, next) => {
+  try {
+    const staffId = req.body.staffId || req.body.staff_id;
+    const doctorId = req.body.doctorId || req.body.doctor_id;
+    const nurseId = req.body.nurseId || req.body.nurse_id;
+    let branchId = req.body.branchId || req.body.branch_id;
+    let payStructureId = req.body.payStructureId || req.body.pay_structure_id;
+    let payMonth = req.body.payMonth || req.body.month;
+    const salaryAmount = req.body.salaryAmount !== undefined ? req.body.salaryAmount : (req.body.basicSalary !== undefined ? req.body.basicSalary : 0);
+    const basePayApplied = req.body.basePayApplied !== undefined ? req.body.basePayApplied : salaryAmount;
+    const allowanceApplied = req.body.allowanceApplied !== undefined ? req.body.allowanceApplied : 0;
+
+    if (!payMonth) {
+      payMonth = new Date().toISOString().slice(0, 7) + '-01';
+    } else if (payMonth.length === 7) {
+      payMonth = `${payMonth}-01`;
+    }
+
+    if (!branchId) {
+      if (staffId) {
+        const st = await db.query('SELECT branch_id FROM staff WHERE staff_id = $1', [staffId]);
+        branchId = st.rows[0]?.branch_id;
+      }
+      if (!branchId) branchId = 1;
+    }
+
+    if (!payStructureId) {
+      const ps = await db.query('SELECT pay_structure_id FROM pay_structure LIMIT 1');
+      payStructureId = ps.rows[0]?.pay_structure_id || 1;
+    }
+
+    // Exactly one of doctorId, nurseId, staffId must be non-null
+    const targetStaffId = staffId || (!doctorId && !nurseId ? 1 : null);
+
+    const result = await db.query(
+      `INSERT INTO salary (branch_id, doctor_id, nurse_id, staff_id, pay_structure_id, pay_month, base_pay_applied, allowance_applied, salary_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [branchId, doctorId || null, nurseId || null, targetStaffId, payStructureId, payMonth, Number(basePayApplied), Number(allowanceApplied), Number(salaryAmount)]
+    );
+
+    return sendSuccess(res, 201, { salary: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateSalary = async (req, res, next) => {
   try {
-    const { status, paymentDate } = req.body;
+    const { basePayApplied, allowanceApplied, salaryAmount } = req.body;
     const result = await db.query(
       `UPDATE salary
-       SET status = COALESCE($1, status),
-           payment_date = COALESCE($2, payment_date),
-           updated_at = NOW()
-       WHERE salary_id = $3 RETURNING *`,
-      [status || null, paymentDate || new Date().toISOString().split('T')[0], req.params.id]
+       SET base_pay_applied = COALESCE($1, base_pay_applied),
+           allowance_applied = COALESCE($2, allowance_applied),
+           salary_amount = COALESCE($3, salary_amount)
+       WHERE salary_id = $4 RETURNING *`,
+      [basePayApplied || null, allowanceApplied || null, salaryAmount || null, req.params.id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Salary record not found.');
     return sendSuccess(res, 200, { salary: result.rows[0] });
@@ -413,4 +564,3 @@ exports.updateSalary = async (req, res, next) => {
     next(error);
   }
 };
-

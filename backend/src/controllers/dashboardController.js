@@ -26,14 +26,14 @@ exports.getDashboardStats = async (req, res, next) => {
 exports.getDashboardAppointments = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT a.appointment_id, a.appointment_date, a.start_time, a.status,
-              p.first_name || ' ' || COALESCE(p.last_name, '') AS patient_name,
-              d.doctor_name
+      `SELECT a.appointment_id, a.appointment_date, a.appointment_time, a.status,
+              p.name AS patient_name,
+              d.name AS doctor_name
        FROM appointment a
        JOIN patient p ON p.patient_id = a.patient_id
        JOIN doctor d ON d.doctor_id = a.doctor_id
        WHERE a.appointment_date >= CURRENT_DATE
-       ORDER BY a.appointment_date, a.start_time
+       ORDER BY a.appointment_date, a.appointment_time
        LIMIT 10`
     );
 
@@ -46,7 +46,7 @@ exports.getDashboardAppointments = async (req, res, next) => {
 exports.getDashboardPatients = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT patient_id, first_name, last_name, status, blood_group
+      `SELECT patient_id, name
        FROM patient
        ORDER BY patient_id DESC
        LIMIT 10`
