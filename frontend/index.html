@@ -1,446 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MediCare HMS – Sign In</title>
-  <meta name="description" content="Hospital Management System – Secure login portal for healthcare staff." />
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <style>
-    /* ── Login page extra styles ────────────────────────────── */
-    body { overflow: hidden; }
-    @media (max-width: 900px) { body { overflow: auto; } }
-
-    .login-page {
-      min-height: 100vh;
-      display: flex;
-      background: #0A1628;
-    }
-
-    /* ── LEFT PANEL ── */
-    .login-left {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 3.5rem;
-    }
-    /* Hero image fills entire left panel */
-    .login-hero-bg {
-      position: absolute;
-      inset: 0;
-      background: url('assets/login-hero.png') center/cover no-repeat;
-      z-index: 0;
-    }
-    /* Gradient overlay so text is readable */
-    .login-hero-bg::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        135deg,
-        rgba(10,22,40,.85) 0%,
-        rgba(10,22,40,.60) 50%,
-        rgba(13,148,136,.25) 100%
-      );
-    }
-    .login-left-content {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 480px;
-    }
-    .login-tagline {
-      font-size: 2.8rem;
-      font-weight: 900;
-      color: #fff;
-      line-height: 1.1;
-      letter-spacing: -.02em;
-      text-shadow: 0 2px 20px rgba(0,0,0,.4);
-    }
-    .login-tagline span { color: #60A5FA; }
-    .login-tagline-sub {
-      font-size: 1.05rem;
-      color: rgba(255,255,255,.7);
-      margin-top: 1rem;
-      max-width: 400px;
-      line-height: 1.65;
-    }
-
-    /* Stats image */
-    .login-stats-img {
-      margin-top: 2.5rem;
-      width: 100%;
-      max-width: 440px;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.5);
-      border: 1px solid rgba(255,255,255,.1);
-    }
-
-    /* Feature list */
-    .login-features {
-      margin-top: 2.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: .9rem;
-    }
-    .feat-item {
-      display: flex;
-      align-items: center;
-      gap: .85rem;
-      color: rgba(255,255,255,.85);
-      font-size: .9rem;
-    }
-    .feat-item .icon-box {
-      width: 34px; height: 34px;
-      background: rgba(255,255,255,.1);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .85rem;
-      color: #34D399;
-      flex-shrink: 0;
-    }
-
-    /* Scrolling badge strip */
-    .badge-strip {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      padding: 1rem 2rem;
-      background: rgba(0,0,0,.35);
-      backdrop-filter: blur(8px);
-      display: flex;
-      gap: 1.5rem;
-      overflow: hidden;
-      z-index: 2;
-    }
-    .strip-badge {
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      color: rgba(255,255,255,.8);
-      font-size: .8rem;
-      font-weight: 500;
-      white-space: nowrap;
-    }
-    .strip-dot { width: 8px; height: 8px; border-radius: 50%; background: #34D399; flex-shrink: 0; }
-    .strip-dot.red { background: #EF4444; }
-    .strip-dot.yellow { background: #F59E0B; }
-
-    /* ── RIGHT PANEL (login form) ── */
-    .login-right {
-      width: 460px;
-      flex-shrink: 0;
-      background: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 2.75rem;
-      border-radius: 28px 0 0 28px;
-      position: relative;
-      box-shadow: -20px 0 60px rgba(0,0,0,.25);
-    }
-    .login-form-inner { width: 100%; max-width: 360px; }
-
-    /* Logo */
-    .login-logo {
-      display: flex; align-items: center; gap: .85rem;
-      margin-bottom: 2.25rem;
-    }
-    .login-logo-icon {
-      width: 46px; height: 46px;
-      background: linear-gradient(135deg, var(--primary), var(--teal));
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 1.3rem;
-      box-shadow: 0 4px 12px rgba(37,99,235,.35);
-    }
-    .login-logo-text .name { font-size: 1.1rem; font-weight: 800; color: var(--gray-900); }
-    .login-logo-text .sub  { font-size: .72rem; color: var(--gray-500); }
-
-    .login-title    { font-size: 1.6rem; font-weight: 800; color: var(--gray-900); }
-    .login-subtitle { font-size: .875rem; color: var(--gray-500); margin-top: .3rem; margin-bottom: 2rem; }
-
-    /* Animated input labels */
-    .form-float { position: relative; margin-bottom: 1.1rem; }
-    .form-float input {
-      width: 100%;
-      padding: 1.05rem 1rem .45rem 2.75rem;
-      border: 1.5px solid var(--gray-200);
-      border-radius: var(--radius);
-      font-size: .9rem;
-      color: var(--gray-800);
-      background: var(--gray-50);
-      transition: var(--transition);
-      font-family: inherit;
-    }
-    .form-float input:focus {
-      border-color: var(--primary);
-      background: #fff;
-      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
-      outline: none;
-    }
-    .form-float label {
-      position: absolute;
-      left: 2.75rem;
-      top: 50%; transform: translateY(-50%);
-      font-size: .9rem;
-      color: var(--gray-400);
-      pointer-events: none;
-      transition: all .2s ease;
-      background: transparent;
-    }
-    .form-float input:focus ~ label,
-    .form-float input:not(:placeholder-shown) ~ label {
-      top: .55rem; transform: none;
-      font-size: .7rem; font-weight: 600;
-      color: var(--primary);
-    }
-    .form-float .fi {
-      position: absolute;
-      left: .9rem; top: 50%; transform: translateY(-50%);
-      color: var(--gray-400); font-size: .95rem;
-      pointer-events: none;
-    }
-    .form-float input:focus ~ .fi { color: var(--primary); }
-    .pass-toggle {
-      position: absolute;
-      right: .9rem; top: 50%; transform: translateY(-50%);
-      color: var(--gray-400); cursor: pointer; font-size: .9rem;
-      transition: color .2s;
-    }
-    .pass-toggle:hover { color: var(--primary); }
-
-    /* Error messages */
-    .field-error { color: var(--danger); font-size: .78rem; margin-top: .3rem; display: none; animation: slideDown .2s ease; }
-    @keyframes slideDown { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
-    .form-float input.error { border-color: var(--danger); background: #FFF5F5; }
-
-    /* Remember / Forgot row */
-    .remember-row {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 1.5rem;
-    }
-    .checkbox-label { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--gray-600); cursor: pointer; }
-    .checkbox-label input { width: 15px; height: 15px; accent-color: var(--primary); }
-    .forgot-link { font-size: .85rem; color: var(--primary); font-weight: 500; }
-    .forgot-link:hover { text-decoration: underline; }
-
-    /* Login button */
-    .login-btn {
-      width: 100%; padding: .9rem;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff; border-radius: var(--radius);
-      font-size: .95rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center; gap: .6rem;
-      transition: var(--transition);
-      box-shadow: 0 4px 20px rgba(37,99,235,.4);
-    }
-    .login-btn:hover {
-      background: linear-gradient(135deg, var(--primary-dark), #1e3a8a);
-      box-shadow: 0 6px 28px rgba(37,99,235,.5);
-      transform: translateY(-1px);
-    }
-    .login-btn:active { transform: translateY(0); }
-    .login-btn:disabled { opacity: .65; cursor: not-allowed; transform: none; }
-
-    /* Demo credentials box */
-    .demo-box {
-      background: linear-gradient(135deg, var(--primary-light), var(--teal-light));
-      border: 1px solid rgba(37,99,235,.15);
-      border-radius: var(--radius);
-      padding: .9rem 1rem;
-      font-size: .8rem;
-      color: var(--gray-700);
-      margin-top: 1.5rem;
-    }
-    .demo-box strong { display: block; color: var(--primary); margin-bottom: .3rem; font-size: .82rem; }
-    .demo-box code { background: rgba(37,99,235,.1); border-radius: 4px; padding: .1rem .4rem; font-family: monospace; }
-
-    /* Trust badges */
-    .trust-badges {
-      display: flex; gap: 1rem; margin-top: 1.75rem;
-      justify-content: center;
-    }
-    .trust-item {
-      display: flex; align-items: center; gap: .4rem;
-      font-size: .75rem; color: var(--gray-400);
-    }
-    .trust-item i { color: var(--success); }
-
-    /* Loading overlay */
-    #login-loading {
-      display: none; position: fixed; inset: 0;
-      background: rgba(255,255,255,.92);
-      backdrop-filter: blur(6px);
-      z-index: 9999;
-      align-items: center; justify-content: center; flex-direction: column; gap: 1.25rem;
-    }
-    #login-loading.active { display: flex; }
-    .loading-logo { width: 56px; height: 56px; background: linear-gradient(135deg, var(--primary), var(--teal)); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.6rem; animation: pulse 1.5s ease-in-out infinite; }
-    .loading-text { font-size: .95rem; font-weight: 600; color: var(--gray-700); }
-    .loading-sub  { font-size: .8rem; color: var(--gray-400); margin-top: -.5rem; }
-
-    /* Responsive */
-    @media (max-width: 900px) {
-      body { overflow: auto; }
-      .login-left { display: none; }
-      .login-right { width: 100%; border-radius: 0; min-height: 100vh; }
-    }
-    @media (max-width: 480px) {
-      .login-right { padding: 2rem 1.5rem; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MediCare HMS — Sign in</title>
+<link rel="stylesheet" href="css/styles.css" />
+<style>
+  :root {color-scheme:dark;--gray-900:#efeff4;--gray-800:#d4d5de;--gray-700:#bbbdc6;--gray-600:#afb1ba;--gray-500:#999ba5;--gray-400:#888a96;--gray-200:#393942;--gray-50:#18191d;--primary:#ae96f5;--danger:#f397a7;}
+  * {box-sizing:border-box} body{margin:0;background:#09090b;color:#f2f2f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  .login-page{display:grid;grid-template-columns:minmax(0,1fr) 465px;min-height:100vh}
+  .login-left{background:#101114;border-right:1px solid #27282e;padding:44px 52px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+  .login-brand{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:700;letter-spacing:-.4px}
+  .brand-mark,.login-logo-icon{width:30px;height:30px;background:#292430;border:1px solid #484052;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#c6b3f3;font-size:15px}
+  .left-heading{max-width:540px;font-size:clamp(32px,3.6vw,54px);letter-spacing:-2.3px;line-height:1.12;font-weight:680;margin:0 0 18px}
+  .left-tagline{font-size:12px;line-height:1.8;color:#9799a5;max-width:420px}
+  .mini-visual{margin-top:38px;max-width:550px;aspect-ratio:2.25/1;background:#17181c;border:1px solid #303137;border-radius:7px;padding:20px 18px;display:flex;flex-direction:column;gap:17px}
+  .visual-title{font-size:11px;color:#d2d2dc;font-weight:600;display:flex;justify-content:space-between}.visual-title span{color:#898a97;font-weight:400}
+  .visual-bars{display:flex;align-items:end;gap:7px;flex:1;border-bottom:1px solid #444351;background:repeating-linear-gradient(to top, transparent 0px,transparent calc(25% - 1px),#303139 calc(25% - 1px),#303139 25%)}
+  .visual-bars span{flex:1;max-width:35px;min-width:4px;background:linear-gradient(180deg,rgba(179,146,248,.86),rgba(127,99,187,.2));height:var(--h);border-radius:3px 3px 0 0}
+  .login-caption{font-size:10px;color:#777984}
+  .login-right{display:flex;align-items:center;justify-content:center;padding:34px;background:#09090b}
+  .login-form-inner{width:100%;max-width:340px}
+  .login-logo{display:flex;gap:10px;align-items:center;margin-bottom:37px}
+  .login-logo-text .name{font-size:14px;font-weight:700;color:#f3f3f6}.login-logo-text .sub{font-size:10px;color:#8d909b;margin-top:4px}
+  .login-title{font-size:23px;font-weight:650;letter-spacing:-.65px;margin:0}.login-subtitle{font-size:12px;color:#9698a3;margin:8px 0 27px}
+  .form-float{position:relative;margin:0 0 19px;padding-top:18px}
+  .form-float label{position:absolute;top:0;left:0;color:#b0b1bb;font-size:11px;font-weight:570}
+  .form-float .fi{display:none}
+  .form-float input{width:100%;height:42px;border:1px solid #383941;border-radius:5px;background:#17181c;color:#f1f1f3;padding:9px 38px 9px 11px;font-size:12px;outline:none}
+  .form-float input:focus{border-color:#b49af7;box-shadow:0 0 0 2px #b49af71d}
+  .form-float input.error{border-color:#d68e9d}
+  .field-error{color:#f5a0ad;font-size:10px;margin-top:7px;display:none}
+  .pass-toggle{position:absolute;right:12px;bottom:14px;font-size:12px;color:#9899a3;cursor:pointer}
+  .remember-row{display:flex;align-items:center;justify-content:flex-start;margin:4px 0 22px}.checkbox-label{display:flex;align-items:center;gap:8px;font-size:11px;color:#a8a9b5}.checkbox-label input{accent-color:#ab90ef}
+  .login-btn{width:100%;min-height:42px;background:#beaaf9;color:#181520;border:1px solid #beaaf9;border-radius:5px;font-size:12px;font-weight:650;cursor:pointer;transition:background .2s}
+  .login-btn:hover{background:#d0bffc}.login-btn:disabled{opacity:.65;cursor:wait}
+  .demo-box{margin-top:25px;padding:12px 13px;border:1px solid #373840;background:#18191c;border-radius:6px;color:#8c8e9a;font-size:10px;line-height:1.8}
+  .demo-box strong{display:block;color:#d3d4dc;font-size:11px;margin-bottom:3px}.demo-box code{font-family:ui-monospace,monospace;color:#cbbafa}
+  #login-loading{display:none;position:fixed;inset:0;background:#09090bed;z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+  #login-loading.active{display:flex}.loading-text{font-size:13px;color:#e7e7ec}.loading-sub{font-size:11px;color:#999ba8}.loading-logo{color:#c8b3fa}
+  #toast-container{position:fixed;right:20px;top:20px;z-index:1000}.toast{margin-bottom:8px;padding:12px 15px;background:#202027;border:1px solid #3d3d4d;border-radius:6px;color:#eee;display:flex;gap:10px;align-items:center;font-size:12px}.toast-close{margin-left:12px;cursor:pointer}
+  @media(max-width:960px){.login-page{grid-template-columns:1fr}.login-left{display:none}.login-right{min-height:100vh;padding:24px}}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-
-<!-- Loading overlay -->
-<div id="login-loading">
-  <div class="loading-logo"><i class="fas fa-heartbeat"></i></div>
-  <div class="loading-text">Signing you in…</div>
-  <div class="loading-sub">Verifying credentials and loading your workspace</div>
-  <div class="spinner" style="width:32px;height:32px;margin-top:.5rem"></div>
-</div>
-
-<div id="toast-container"></div>
-
+<div id="login-loading"><div class="loading-logo">▦</div><div class="loading-text">Signing in…</div><div class="loading-sub">Checking credentials</div><div class="spinner"></div></div>
+<div id="toast-container" aria-live="polite"></div>
 <div class="login-page">
-
-  <!-- ═══════════════════════════════════════
-       LEFT PANEL — Hero Image + Content
-  ══════════════════════════════════════════ -->
-  <div class="login-left">
-    <!-- Background hero image -->
-    <div class="login-hero-bg"></div>
-
-    <!-- Foreground content -->
-    <div class="login-left-content">
-      <!-- Heading -->
-      <div class="login-tagline">
-        Smarter<br/>
-        <span>Healthcare</span><br/>
-        Management
-      </div>
-      <p class="login-tagline-sub">
-        One unified platform to manage patients, doctors, appointments, billing,
-        and operations — built for modern hospitals.
-      </p>
-
-      <!-- Stats screenshot image -->
-      <img
-        src="assets/login-stats.png"
-        alt="Hospital dashboard statistics preview"
-        class="login-stats-img"
-        loading="eager"
-      />
-
-      <!-- Feature list -->
-      <div class="login-features">
-        <div class="feat-item">
-          <div class="icon-box"><i class="fas fa-shield-alt"></i></div>
-          HIPAA-compliant &amp; end-to-end encrypted
-        </div>
-        <div class="feat-item">
-          <div class="icon-box"><i class="fas fa-bolt"></i></div>
-          Real-time updates across all departments
-        </div>
-        <div class="feat-item">
-          <div class="icon-box"><i class="fas fa-chart-line"></i></div>
-          Advanced analytics &amp; automated reports
-        </div>
-      </div>
+  <section class="login-left" aria-label="Hospital management workspace">
+    <div class="login-brand"><span class="brand-mark">✣</span> MediCare <span style="font-size:10px;font-weight:400;color:#777984">/ HMS</span></div>
+    <div><h2 class="left-heading">Clinical operations.<br/>One workspace.</h2><p class="left-tagline">Patients, doctors, appointments and financial records in a focused database workspace.</p>
+      <div class="mini-visual" aria-hidden="true"><div class="visual-title">Activity overview <span>Monthly trend · illustrative</span></div><div class="visual-bars">
+        <span style="--h:38%"></span><span style="--h:45%"></span><span style="--h:42%"></span><span style="--h:61%"></span><span style="--h:55%"></span><span style="--h:64%"></span><span style="--h:58%"></span><span style="--h:76%"></span><span style="--h:70%"></span><span style="--h:81%"></span><span style="--h:75%"></span><span style="--h:94%"></span>
+      </div></div>
     </div>
-
-    <!-- Bottom strip -->
-    <div class="badge-strip">
-      <div class="strip-badge"><div class="strip-dot"></div>48 Doctors Online</div>
-      <div class="strip-badge"><div class="strip-dot yellow"></div>23 Pending Appointments</div>
-      <div class="strip-badge"><div class="strip-dot red"></div>2 Critical Patients</div>
-      <div class="strip-badge"><div class="strip-dot"></div>System Uptime 99.8%</div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════
-       RIGHT PANEL — Login Form
-  ══════════════════════════════════════════ -->
-  <div class="login-right">
-    <div class="login-form-inner">
-
-      <!-- Logo -->
-      <div class="login-logo">
-        <div class="login-logo-icon"><i class="fas fa-heartbeat"></i></div>
-        <div class="login-logo-text">
-          <div class="name">MediCare HMS</div>
-          <div class="sub">Hospital Management System</div>
-        </div>
-      </div>
-
-      <h1 class="login-title">Welcome back 👋</h1>
-      <p class="login-subtitle">Sign in to access your dashboard</p>
-
-      <form id="login-form" novalidate>
-
-        <!-- Username -->
-        <div class="form-float">
-          <i class="fas fa-user fi"></i>
-          <input
-            type="text" id="email" placeholder=" "
-            value="admin" autocomplete="username"
-            aria-label="Username or email"
-          />
-          <label for="email">Username or email</label>
-          <div class="field-error" id="email-error"><i class="fas fa-exclamation-circle"></i> Please enter a valid username.</div>
-        </div>
-
-        <!-- Password -->
-        <div class="form-float" style="position:relative">
-          <i class="fas fa-lock fi"></i>
-          <input
-            type="password" id="password" placeholder=" "
-            value="admin123" autocomplete="current-password"
-            aria-label="Password"
-          />
-          <label for="password">Password</label>
-          <i class="fas fa-eye pass-toggle" id="toggle-pass" role="button" aria-label="Toggle password visibility" tabindex="0"></i>
-          <div class="field-error" id="pass-error"><i class="fas fa-exclamation-circle"></i> Password must be at least 6 characters.</div>
-        </div>
-
-        <!-- Remember / Forgot -->
-        <div class="remember-row">
-          <label class="checkbox-label">
-            <input type="checkbox" id="remember-me" checked />
-            <span>Remember me</span>
-          </label>
-          <a href="#" class="forgot-link" id="forgot-link">Forgot password?</a>
-        </div>
-
-        <!-- Submit -->
-        <button type="submit" class="login-btn" id="login-btn">
-          <i class="fas fa-sign-in-alt"></i>
-          Sign In
-        </button>
-      </form>
-
-      <!-- Demo credentials -->
-      <div class="demo-box">
-        <strong><i class="fas fa-circle-info"></i> Demo Credentials</strong>
-        Username: <code>admin</code> &nbsp;|&nbsp; Password: <code>admin123</code>
-      </div>
-
-      <!-- Trust badges -->
-      <div class="trust-badges">
-        <div class="trust-item"><i class="fas fa-lock"></i> Encrypted</div>
-        <div class="trust-item"><i class="fas fa-shield-halved"></i> HIPAA</div>
-        <div class="trust-item"><i class="fas fa-circle-check"></i> ISO 27001</div>
-      </div>
-    </div>
-  </div>
+    <div class="login-caption">DBMS · PostgreSQL · Secure role-based access</div>
+  </section>
+  <main class="login-right"><div class="login-form-inner">
+    <div class="login-logo"><span class="login-logo-icon">✣</span><div class="login-logo-text"><div class="name">MediCare HMS</div><div class="sub">Hospital management system</div></div></div>
+    <h1 class="login-title">Sign in</h1><p class="login-subtitle">Enter your account credentials to continue.</p>
+    <form id="login-form" novalidate>
+      <div class="form-float"><input type="text" id="email" placeholder="Enter username" autocomplete="username" aria-label="Username" /><label for="email">Username</label><div class="field-error" id="email-error">Please enter your username.</div></div>
+      <div class="form-float"><input type="password" id="password" placeholder="Enter password" autocomplete="current-password" aria-label="Password" /><label for="password">Password</label><span class="pass-toggle" id="toggle-pass" role="button" aria-label="Toggle password visibility" tabindex="0">Show</span><div class="field-error" id="pass-error">Password must be at least six characters.</div></div>
+      <div class="remember-row"><label class="checkbox-label"><input type="checkbox" id="remember-me" checked /> Remember this session</label></div>
+      <button type="submit" class="login-btn" id="login-btn">Sign in →</button>
+    </form>
+    <div class="demo-box"><strong>Coursework demo access</strong> Username <code>admin</code> · password <code>admin123</code>. Change the seeded password before any real deployment.</div>
+  </div></main>
 </div>
-
 <script>
   function showToast(msg, type='info') {
     const icons = { info:'fa-info-circle', success:'fa-check-circle', error:'fa-times-circle', warning:'fa-exclamation-triangle' };
@@ -456,15 +84,9 @@
   const toggleBtn  = document.getElementById('toggle-pass');
   toggleBtn.addEventListener('click', () => {
     passInput.type = passInput.type === 'password' ? 'text' : 'password';
-    toggleBtn.classList.toggle('fa-eye'); toggleBtn.classList.toggle('fa-eye-slash');
+    toggleBtn.textContent = passInput.type === 'password' ? 'Show' : 'Hide';
   });
   toggleBtn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') toggleBtn.click(); });
-
-  // Forgot password
-  document.getElementById('forgot-link').addEventListener('click', e => {
-    e.preventDefault();
-    showToast('Password reset link sent to your email ✉️', 'success');
-  });
 
   // Form submit
   document.getElementById('login-form').addEventListener('submit', async function(e) {
