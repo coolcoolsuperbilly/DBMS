@@ -9,7 +9,7 @@ const DB_USER = process.env.DB_USER || 'postgres';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'postgres';
 const DB_NAME = process.env.DB_NAME || 'medicare_hms';
 
-const psqlBase = `psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}`;
+const psqlBase = `psql -v ON_ERROR_STOP=1 -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}`;
 
 function run(command) {
   try {
