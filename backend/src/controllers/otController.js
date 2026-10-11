@@ -52,19 +52,14 @@ exports.createOtSchedule = async (req, res, next) => {
     const otId = req.body.otId || req.body.theatreId;
     const doctorId = req.body.doctorId || req.body.doctor_id;
     const patientId = req.body.patientId || req.body.patient_id;
-    let nurseId = req.body.nurseId || req.body.nurse_id;
+    const nurseId = req.body.nurseId || req.body.nurse_id;
     const proc = req.body.procedure || req.body.procedureName || 'Surgery';
     const scheduleStart = req.body.scheduleStart || (req.body.scheduledDate && req.body.startTime ? `${req.body.scheduledDate} ${req.body.startTime}:00` : null);
     const scheduleEnd = req.body.scheduleEnd || (req.body.scheduledDate && req.body.endTime ? `${req.body.scheduledDate} ${req.body.endTime}:00` : null);
     const status = req.body.status || 'scheduled';
 
-    if (!otId || !doctorId || !patientId || !scheduleStart || !scheduleEnd) {
-      return sendError(res, 400, 'OT, doctor, patient, date, start and end times are required.');
-    }
-
-    if (!nurseId) {
-      const nurseRes = await db.query('SELECT nurse_id FROM nurse LIMIT 1');
-      nurseId = nurseRes.rows[0]?.nurse_id || 1;
+    if (!otId || !doctorId || !patientId || !nurseId || !scheduleStart || !scheduleEnd) {
+      return sendError(res, 400, 'OT, doctor, nurse, patient, date, start and end times are required.');
     }
 
     // DB triggers enforce branch match and overlap rules

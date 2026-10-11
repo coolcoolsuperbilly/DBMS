@@ -8,7 +8,7 @@
 <style>
   :root {color-scheme:dark;--gray-900:#efeff4;--gray-800:#d4d5de;--gray-700:#bbbdc6;--gray-600:#afb1ba;--gray-500:#999ba5;--gray-400:#888a96;--gray-200:#393942;--gray-50:#18191d;--primary:#ae96f5;--danger:#f397a7;}
   * {box-sizing:border-box} body{margin:0;background:#09090b;color:#f2f2f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-  .login-page{display:grid;grid-template-columns:minmax(0,1fr) 465px;min-height:100vh}
+  .login-page{display:grid;grid-template-columns:minmax(0,1fr) 465px;min-height:100vh;overflow:hidden}
   .login-left{background:#101114;border-right:1px solid #27282e;padding:44px 52px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
   .login-brand{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:700;letter-spacing:-.4px}
   .brand-mark,.login-logo-icon{width:30px;height:30px;background:#292430;border:1px solid #484052;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#c6b3f3;font-size:15px}
@@ -19,8 +19,8 @@
   .visual-bars{display:flex;align-items:end;gap:7px;flex:1;border-bottom:1px solid #444351;background:repeating-linear-gradient(to top, transparent 0px,transparent calc(25% - 1px),#303139 calc(25% - 1px),#303139 25%)}
   .visual-bars span{flex:1;max-width:35px;min-width:4px;background:linear-gradient(180deg,rgba(179,146,248,.86),rgba(127,99,187,.2));height:var(--h);border-radius:3px 3px 0 0}
   .login-caption{font-size:10px;color:#777984}
-  .login-right{display:flex;align-items:center;justify-content:center;padding:34px;background:#09090b}
-  .login-form-inner{width:100%;max-width:340px}
+  .login-right{display:flex;align-items:center;justify-content:center;padding:34px;background:#09090b;border-radius:0;min-width:0}
+  .login-form-inner{width:100%;max-width:340px;border-radius:6px}
   .login-logo{display:flex;gap:10px;align-items:center;margin-bottom:37px}
   .login-logo-text .name{font-size:14px;font-weight:700;color:#f3f3f6}.login-logo-text .sub{font-size:10px;color:#8d909b;margin-top:4px}
   .login-title{font-size:23px;font-weight:650;letter-spacing:-.65px;margin:0}.login-subtitle{font-size:12px;color:#9698a3;margin:8px 0 27px}
@@ -59,7 +59,7 @@
   </section>
   <main class="login-right"><div class="login-form-inner">
     <div class="login-logo"><span class="login-logo-icon">✣</span><div class="login-logo-text"><div class="name">MediCare HMS</div><div class="sub">Hospital management system</div></div></div>
-    <h1 class="login-title">Sign in</h1><p class="login-subtitle">Enter your account credentials to continue.</p>
+    <h1 class="login-title">Authorized personnel login</h1><p class="login-subtitle">Sign in with your assigned hospital account.</p>
     <form id="login-form" novalidate>
       <div class="form-float"><input type="text" id="email" placeholder="Enter username" autocomplete="username" aria-label="Username" /><label for="email">Username</label><div class="field-error" id="email-error">Please enter your username.</div></div>
       <div class="form-float"><input type="password" id="password" placeholder="Enter password" autocomplete="current-password" aria-label="Password" /><label for="password">Password</label><span class="pass-toggle" id="toggle-pass" role="button" aria-label="Toggle password visibility" tabindex="0">Show</span><div class="field-error" id="pass-error">Password must be at least six characters.</div></div>

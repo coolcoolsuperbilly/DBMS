@@ -251,6 +251,8 @@ function initPage(page) {
     case 'doctorshifts':      initDoctorShifts();      break;
     case 'pharmacyinventory': initPharmacyInventory(); break;
   }
+  // The role-aware schema components are loaded last. Hide actions the API rejects.
+  if (typeof scApplyRoleActions === 'function') scApplyRoleActions();
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -2149,6 +2151,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-search')?.addEventListener('keydown', e=>{if(e.key==='Enter')toast(`Searching for "${e.target.value}"…`,'info');});
 
   if(!requireAuth()) return;
-  renderNotifications();
+  // Notifications are not part of the HMS schema; no mock notification source is loaded.
   navigate('dashboard');
 });

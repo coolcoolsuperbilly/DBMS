@@ -9,7 +9,6 @@ const mapRoom = (r) => ({
   roomNumber: r.room_no,
   status: r.availability_status,
   branch_name: r.branch_location,
-  capacity: 1,
 });
 
 exports.getRooms = async (req, res, next) => {
@@ -81,7 +80,7 @@ exports.updateRoom = async (req, res, next) => {
     if (req.params.id && req.params.id.includes('_')) {
       const parts = req.params.id.split('_');
       branchId = parts[0];
-      roomNo = parts[1];
+      roomNo = parts.slice(1).join('_');
     } else if (!branchId) {
       // Find branchId for roomNo
       const found = await db.query('SELECT branch_id FROM room WHERE room_no = $1 LIMIT 1', [roomNo]);

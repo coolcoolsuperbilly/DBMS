@@ -62,6 +62,7 @@ app.get('/api/departments', require('./middleware/auth').protect, require('./mid
 app.post('/api/departments', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','STAFF'), catalogController.createDepartment);
 app.get('/api/nurses', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','NURSE','DOCTOR','STAFF'), catalogController.getNurses);
 app.post('/api/nurses', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','STAFF','NURSE'), catalogController.createNurse);
+app.put('/api/nurses/:id', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','STAFF'), catalogController.updateNurse);
 app.get('/api/admissions', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','DOCTOR','NURSE','STAFF','BILLING'), catalogController.getAdmissions);
 app.post('/api/admissions', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','DOCTOR','STAFF'), catalogController.createAdmission);
 app.put('/api/admissions/:id', require('./middleware/auth').protect, require('./middleware/auth').authorize('ADMIN','DOCTOR','STAFF'), catalogController.updateAdmission);

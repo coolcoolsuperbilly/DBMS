@@ -127,9 +127,7 @@ exports.getNurses = async (req, res, next) => {
       `SELECT n.*,
               n.nurse_id AS id,
               n.name AS nurse_name,
-              b.location AS branch_location,
-              'General' AS department_name,
-              'active' AS status
+              b.location AS branch_location
        FROM nurse n
        JOIN branch b ON b.branch_id = n.branch_id
        ${where}
@@ -145,10 +143,10 @@ exports.getNurses = async (req, res, next) => {
 
 exports.createNurse = async (req, res, next) => {
   try {
-    const branchId = req.body.branchId || req.body.branch_id || 1;
-    const name = req.body.name || req.body.nurseName;
-    const shift = req.body.shift || 'day';
-    if (!name) return sendError(res, 400, 'Nurse name is required.');
+    const branchId = req.body.branchId ?? req.body.branch_id;
+    const name = String(req.body.name || req.body.nurseName || '').trim();
+    const shift = req.body.shift || null;
+    if (!name || !Number.isSafeInteger(Number(branchId)) || Number(branchId) <= 0) return sendError(res, 400, 'Nurse name and valid branch ID are required.');
 
     const result = await db.query(
       `INSERT INTO nurse (branch_id, name, shift)
@@ -166,6 +164,29 @@ exports.createNurse = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Nurse edits preserve the exact Nurse(name, shift, branch_id) relation.
+exports.updateNurse = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = Number(req.body.branchId ?? req.body.branch_id);
+    const name = String(req.body.name || '').trim();
+    if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(branchId) || branchId <= 0 || !name)
+      return sendError(res, 400, 'Valid nurse ID, name and branch are required.');
+    const shift = req.body.shift === undefined ? null : (String(req.body.shift || '').trim() || null);
+    // Existing OT schedules must continue to refer to nurses from the same branch.
+    const conflicts = await db.query(
+      `SELECT 1 FROM ot_schedule os JOIN operation_theatre ot ON ot.ot_id = os.ot_id
+       WHERE os.nurse_id = $1 AND ot.branch_id <> $2 LIMIT 1`, [id, branchId]);
+    if (conflicts.rows.length) return sendError(res, 409, 'Cannot transfer nurse: existing OT schedules belong to another branch.');
+    const result = await db.query(
+      'UPDATE nurse SET name = $1, shift = $2, branch_id = $3 WHERE nurse_id = $4 RETURNING *',
+      [name, shift, branchId, id]
+    );
+    if (!result.rows.length) return sendError(res, 404, 'Nurse not found.');
+    return sendSuccess(res, 200, { nurse: result.rows[0] });
+  } catch (error) { next(error); }
 };
 
 // ---- Admissions ----
@@ -213,16 +234,11 @@ exports.createAdmission = async (req, res, next) => {
   try {
     const patientId = req.body.patientId || req.body.patient_id;
     const roomNo = req.body.roomNo || req.body.room_no || req.body.roomNumber;
-    let branchId = req.body.branchId || req.body.branch_id;
+    const branchId = req.body.branchId || req.body.branch_id;
     const admitDateTime = req.body.admitDateTime || req.body.admissionDate || new Date();
 
-    if (!patientId || !roomNo) {
-      return sendError(res, 400, 'Patient and room number are required.');
-    }
-
-    if (!branchId) {
-      const roomBranch = await db.query('SELECT branch_id FROM room WHERE room_no = $1 LIMIT 1', [roomNo]);
-      branchId = roomBranch.rows[0]?.branch_id || 1;
+    if (!patientId || !roomNo || !Number.isSafeInteger(Number(branchId)) || Number(branchId) < 1) {
+      return sendError(res, 400, 'Patient, branch and room are required.');
     }
 
     const result = await db.query(
@@ -280,8 +296,7 @@ exports.getEquipment = async (req, res, next) => {
               e.name AS equipment_name,
               e.maintenance_date AS last_maintenance,
               e.maintenance_date AS "lastMaintenance",
-              b.location AS branch_location,
-              'General' AS department_name
+              b.location AS branch_location
        FROM equipment e
        JOIN branch b ON b.branch_id = e.branch_id
        ${where}
@@ -395,7 +410,7 @@ exports.createShiftLog = async (req, res, next) => {
       return sendError(res, 400, 'Start and end times are required.');
     }
     // Exactly one of doctorId, nurseId, staffId must be set (enforced by DB CHECK)
-    const targetStaffId = staffId || (!doctorId && !nurseId ? 1 : null);
+    const targetStaffId = staffId || null;
 
     const result = await db.query(
       `INSERT INTO shift_log (branch_id, doctor_id, nurse_id, staff_id, shift_date, start_time, end_time, status)
@@ -420,8 +435,7 @@ exports.getPayStructures = async (req, res, next) => {
               ps.base_pay AS basic_salary,
               ps.base_pay AS "basicSalary",
               ps.allowance_rate AS allowance,
-              ps.allowance_rate AS allowances,
-              'Staff Position' AS staff_name
+              ps.allowance_rate AS allowances
        FROM pay_structure ps
        ORDER BY ps.pay_structure_id DESC`
     );
@@ -433,13 +447,13 @@ exports.getPayStructures = async (req, res, next) => {
 
 exports.createPayStructure = async (req, res, next) => {
   try {
-    const rawType = (req.body.employeeType || req.body.role || 'staff').toLowerCase();
-    const employeeType = ['doctor', 'nurse', 'staff'].includes(rawType) ? rawType : 'staff';
+    const employeeType = String(req.body.employeeType || req.body.role || '').toLowerCase();
+    if (!['doctor', 'nurse', 'staff'].includes(employeeType)) return sendError(res, 400, 'Employee type must be doctor, nurse, or staff.');
     const basePay = req.body.basePay !== undefined ? req.body.basePay : req.body.basicSalary;
     const allowanceRate = req.body.allowanceRate !== undefined ? req.body.allowanceRate : (req.body.allowances || req.body.hra || 0);
     const status = req.body.status || 'active';
 
-    if (basePay === undefined) return sendError(res, 400, 'Base pay or basic salary is required.');
+    if (basePay === undefined || basePay === '' || !Number.isFinite(Number(basePay)) || Number(basePay) < 0 || !Number.isFinite(Number(allowanceRate)) || Number(allowanceRate) < 0) return sendError(res, 400, 'Valid base pay and allowance rate are required.');
 
     const result = await db.query(
       `INSERT INTO pay_structure (employee_type, base_pay, allowance_rate, status)
@@ -480,10 +494,6 @@ exports.getSalaries = async (req, res, next) => {
               sa.base_pay_applied AS "basicSalary",
               sa.salary_amount AS net_salary,
               sa.salary_amount AS "netSalary",
-              0 AS total_deductions,
-              0 AS deductions,
-              'paid' AS payment_status,
-              'paid' AS status,
               doc.name AS doctor_name,
               n.name AS nurse_name,
               COALESCE(st.name, doc.name, n.name, 'Staff Member') AS staff_name
@@ -506,7 +516,7 @@ exports.createSalary = async (req, res, next) => {
     const staffId = req.body.staffId || req.body.staff_id;
     const doctorId = req.body.doctorId || req.body.doctor_id;
     const nurseId = req.body.nurseId || req.body.nurse_id;
-    let branchId = req.body.branchId || req.body.branch_id;
+    const branchId = req.body.branchId || req.body.branch_id;
     let payStructureId = req.body.payStructureId || req.body.pay_structure_id;
     let payMonth = req.body.payMonth || req.body.month;
     const salaryAmount = req.body.salaryAmount !== undefined ? req.body.salaryAmount : (req.body.basicSalary !== undefined ? req.body.basicSalary : 0);
@@ -524,16 +534,14 @@ exports.createSalary = async (req, res, next) => {
         const st = await db.query('SELECT branch_id FROM staff WHERE staff_id = $1', [staffId]);
         branchId = st.rows[0]?.branch_id;
       }
-      if (!branchId) branchId = 1;
+      if (!branchId) return sendError(res, 400, 'Branch is required.');
     }
 
-    if (!payStructureId) {
-      const ps = await db.query('SELECT pay_structure_id FROM pay_structure LIMIT 1');
-      payStructureId = ps.rows[0]?.pay_structure_id || 1;
-    }
+    if (!payStructureId) return sendError(res, 400, 'Pay structure ID is required.');
 
+    if ([staffId, doctorId, nurseId].filter(Boolean).length !== 1) return sendError(res, 400, 'Exactly one employee ID must be supplied.');
     // Exactly one of doctorId, nurseId, staffId must be non-null
-    const targetStaffId = staffId || (!doctorId && !nurseId ? 1 : null);
+    const targetStaffId = staffId || null;
 
     const result = await db.query(
       `INSERT INTO salary (branch_id, doctor_id, nurse_id, staff_id, pay_structure_id, pay_month, base_pay_applied, allowance_applied, salary_amount)
@@ -556,7 +564,7 @@ exports.updateSalary = async (req, res, next) => {
            allowance_applied = COALESCE($2, allowance_applied),
            salary_amount = COALESCE($3, salary_amount)
        WHERE salary_id = $4 RETURNING *`,
-      [basePayApplied || null, allowanceApplied || null, salaryAmount || null, req.params.id]
+      [basePayApplied ?? null, allowanceApplied ?? null, salaryAmount ?? null, req.params.id]
     );
     if (!result.rows.length) return sendError(res, 404, 'Salary record not found.');
     return sendSuccess(res, 200, { salary: result.rows[0] });

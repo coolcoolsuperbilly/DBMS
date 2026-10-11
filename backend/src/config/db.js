@@ -13,11 +13,8 @@ const pool = new Pool({
   options: '-c search_path=hms,public',
 });
 
-// Set search_path to hms schema on every new client
-pool.on('connect', (client) => {
-  client.query('SET search_path TO hms, public');
-});
-
+// search_path is set when opening the connection using pool.options above.
+// Do not issue client.query() inside pg Pool's connect event (pg@9 deprecation).
 pool.on('error', (err) => {
   console.error('Unexpected PostgreSQL pool error:', err.message);
 });

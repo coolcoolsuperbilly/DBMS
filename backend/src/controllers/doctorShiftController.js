@@ -10,7 +10,6 @@ exports.getDoctorShifts = async (req, res, next) => {
               TO_CHAR(ds.shift_start, 'YYYY-MM-DD') AS shift_date,
               TO_CHAR(ds.shift_start, 'HH24:MI') AS start_time,
               TO_CHAR(ds.shift_end, 'HH24:MI') AS end_time,
-              'scheduled' AS status,
               d.name AS doctor_name,
               b.location AS branch_name,
               b.location AS branch_location

@@ -118,10 +118,10 @@
 
   <div class="sidebar-footer">
     <div class="sidebar-user">
-      <div class="avatar" style="background:#25282e;width:36px;height:36px;font-size:.8rem">AD</div>
+      <div class="avatar account-avatar" style="background:#25282e;width:36px;height:36px;font-size:.8rem">—</div>
       <div class="sidebar-user-info">
-        <div class="name">Administrator</div>
-        <div class="role">System administrator</div>
+        <div class="name account-username">Loading…</div>
+        <div class="role account-role">Checking account</div>
       </div>
     </div>
   </div>
@@ -144,10 +144,10 @@
       <!-- User Menu -->
       <div class="dropdown">
         <div class="header-user" onclick="toggleDropdown('user-dropdown')">
-          <div class="avatar" style="background:#25282e;width:36px;height:36px;font-size:.8rem">AD</div>
+          <div class="avatar account-avatar" style="background:#25282e;width:36px;height:36px;font-size:.8rem">—</div>
           <div class="header-user-info">
-            <div class="name">Administrator</div>
-            <div class="role">System administrator</div>
+            <div class="name account-username">Loading…</div>
+            <div class="role account-role">Checking account</div>
           </div>
           <i class="fas fa-chevron-down" style="font-size:.7rem;color:var(--gray-400);margin-left:.25rem"></i>
         </div>
@@ -493,7 +493,7 @@
 <div class="page" id="page-settings">
   <div class="page-header"><div><h1 class="page-title">Workspace</h1><p class="page-subtitle">System information</p></div></div>
   <section class="card data-panel"><div class="card-header"><span class="card-title">Interface</span></div><div class="card-body">
-    <div class="settings-kv"><span>Appearance</span><strong>Dark · compact</strong></div>
+    <div class="settings-kv"><span>Signed in as</span><strong id="profile-username">—</strong></div><div class="settings-kv"><span>Role</span><strong id="profile-role">—</strong></div><div class="settings-kv"><span>Appearance</span><strong>Dark · compact</strong></div>
     <div class="settings-kv"><span>Data source</span><strong>PostgreSQL via HMS API</strong></div>
     <div class="settings-kv"><span>Workspace</span><strong>Hospital management</strong></div>
     <div class="settings-kv"><span>Appointments</span><strong>30-minute scheduling slots</strong></div>
@@ -525,151 +525,22 @@
 </div></div>
 
 <!-- Branch Form Modal -->
-<div class="modal-overlay" id="modal-branch-form">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Add Branch</span>
-      <div class="modal-close" onclick="closeModal('modal-branch-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Branch Name *</label><input class="form-control" id="brf-name" placeholder="e.g. North Wing" /></div>
-      <div class="form-group"><label>Address</label><textarea class="form-control" id="brf-address" rows="2" placeholder="Branch address"></textarea></div>
-      <div class="two-col">
-        <div class="form-group"><label>Phone</label><input class="form-control" id="brf-phone" placeholder="Phone number" /></div>
-        <div class="form-group"><label>Email</label><input type="email" class="form-control" id="brf-email" placeholder="branch@hospital.com" /></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-branch-form')">Cancel</button>
-      <button class="btn btn-primary" id="branch-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-branch-form"><div class="modal"><div class="modal-header"><span class="modal-title">Add branch</span><button class="modal-close" onclick="closeModal('modal-branch-form')">×</button></div><div class="modal-body"><div class="form-group"><label for="brf-name">Branch location *</label><input class="form-control" id="brf-name" maxlength="150" placeholder="e.g. Kochi Main Hospital" required></div><div class="form-group"><label for="brf-status">Status</label><select class="form-control" id="brf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-branch-form')">Cancel</button><button class="btn btn-primary" id="branch-form-submit">Save branch</button></div></div></div>
 
 <!-- Department Form Modal -->
-<div class="modal-overlay" id="modal-dept-form">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Add Department</span>
-      <div class="modal-close" onclick="closeModal('modal-dept-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Department Name *</label><input class="form-control" id="dpf-name" placeholder="e.g. Cardiology" /></div>
-      <div class="form-group"><label>Branch</label><input type="number" class="form-control" id="dpf-branch" placeholder="Branch ID" value="1" /></div>
-      <div class="form-group"><label>Description</label><textarea class="form-control" id="dpf-desc" rows="2" placeholder="Optional description"></textarea></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-dept-form')">Cancel</button>
-      <button class="btn btn-primary" id="dept-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-dept-form"><div class="modal"><div class="modal-header"><span class="modal-title">Add department</span><button class="modal-close" onclick="closeModal('modal-dept-form')">×</button></div><div class="modal-body"><div class="form-group"><label for="dpf-name">Department name *</label><input class="form-control" id="dpf-name" maxlength="100" required></div><div class="form-group"><label for="dpf-branch">Branch *</label><select class="form-control" id="dpf-branch" required></select></div><div class="form-group"><label for="dpf-status">Status</label><select class="form-control" id="dpf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-dept-form')">Cancel</button><button class="btn btn-primary" id="dept-form-submit">Save department</button></div></div></div>
 
 <!-- Nurse Form Modal -->
-<div class="modal-overlay" id="modal-nurse-form">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <span class="modal-title">Add Nurse</span>
-      <div class="modal-close" onclick="closeModal('modal-nurse-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Full Name *</label><input class="form-control" id="nrf-name" placeholder="Nurse full name" /></div>
-      <div class="two-col">
-        <div class="form-group"><label>Department *</label>
-          <select class="form-control" id="nrf-dept"><option value="">Loading departments…</option></select>
-        </div>
-        <div class="form-group"><label>Branch *</label>
-          <select class="form-control" id="nrf-branch"><option value="">Loading branches…</option></select>
-        </div>
-      </div>
-      <div class="two-col">
-        <div class="form-group"><label>Phone</label><input class="form-control" id="nrf-phone" placeholder="+91 9876543210" /></div>
-        <div class="form-group"><label>Email</label><input type="email" class="form-control" id="nrf-email" placeholder="nurse@hospital.com" /></div>
-      </div>
-      <div class="form-group"><label>Status</label>
-        <select class="form-control" id="nrf-status">
-          <option value="active">Active</option><option value="on_leave">On Leave</option><option value="inactive">Inactive</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-nurse-form')">Cancel</button>
-      <button class="btn btn-primary" id="nurse-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-nurse-form"><div class="modal"><div class="modal-header"><span class="modal-title" id="nurse-form-title">Add nurse</span><button class="modal-close" onclick="closeModal('modal-nurse-form')">×</button></div><div class="modal-body"><div class="form-group"><label for="nrf-name">Nurse name *</label><input class="form-control" id="nrf-name" maxlength="120" required></div><div class="two-col"><div class="form-group"><label for="nrf-shift">Shift</label><input class="form-control" id="nrf-shift" maxlength="50" placeholder="e.g. Day"></div><div class="form-group"><label for="nrf-branch">Branch *</label><select class="form-control" id="nrf-branch" required></select></div></div><p class="form-help">Nurse has NurseID, Name, Shift and BranchID in the approved relational schema.</p></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-nurse-form')">Cancel</button><button class="btn btn-primary" id="nurse-form-submit">Save nurse</button></div></div></div>
 
 <!-- Admission Form Modal -->
-<div class="modal-overlay" id="modal-admission-form">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <span class="modal-title">Admit Patient</span>
-      <div class="modal-close" onclick="closeModal('modal-admission-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="two-col">
-        <div class="form-group"><label>Patient ID *</label><input class="form-control" id="adf-patient" placeholder="Patient ID" /></div>
-        <div class="form-group"><label>Doctor ID</label><input class="form-control" id="adf-doctor" placeholder="Doctor ID" /></div>
-      </div>
-      <div class="two-col">
-        <div class="form-group"><label>Room Number</label><input class="form-control" id="adf-room" placeholder="e.g. 201A" /></div>
-        <div class="form-group"><label>Admission Date</label><input type="date" class="form-control" id="adf-date" /></div>
-      </div>
-      <div class="form-group"><label>Notes</label><textarea class="form-control" id="adf-notes" rows="2" placeholder="Reason for admission…"></textarea></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-admission-form')">Cancel</button>
-      <button class="btn btn-primary" id="admission-form-submit"><i class="fas fa-bed"></i> Admit</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-admission-form"><div class="modal modal-lg"><div class="modal-header"><span class="modal-title">Admit patient</span><button class="modal-close" onclick="closeModal('modal-admission-form')">×</button></div><div class="modal-body"><div class="two-col"><div class="form-group"><label for="adf-patient">Patient *</label><select class="form-control" id="adf-patient" required></select></div><div class="form-group"><label for="adf-branch">Branch *</label><select class="form-control" id="adf-branch" required></select></div></div><div class="two-col"><div class="form-group"><label for="adf-room">Room *</label><select class="form-control" id="adf-room" required></select></div><div class="form-group"><label for="adf-date">Admit date/time *</label><input class="form-control" type="datetime-local" id="adf-date" required></div></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-admission-form')">Cancel</button><button class="btn btn-primary" id="admission-form-submit">Admit</button></div></div></div>
 
 <!-- Pay Structure Form Modal -->
-<div class="modal-overlay" id="modal-paystructure-form">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Add Pay Structure</span>
-      <div class="modal-close" onclick="closeModal('modal-paystructure-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Role / Position *</label><input class="form-control" id="psf-role" placeholder="e.g. Head Nurse" /></div>
-      <div class="two-col">
-        <div class="form-group"><label>Basic Salary (₹) *</label><input type="number" class="form-control" id="psf-basic" min="0" placeholder="0" /></div>
-        <div class="form-group"><label>HRA (₹)</label><input type="number" class="form-control" id="psf-hra" min="0" placeholder="0" /></div>
-      </div>
-      <div class="form-group"><label>Other Allowances (₹)</label><input type="number" class="form-control" id="psf-allowances" min="0" placeholder="0" /></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-paystructure-form')">Cancel</button>
-      <button class="btn btn-primary" id="paystructure-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-paystructure-form"><div class="modal"><div class="modal-header"><span class="modal-title">Add pay structure</span><button class="modal-close" onclick="closeModal('modal-paystructure-form')">×</button></div><div class="modal-body"><div class="form-group"><label for="psf-role">Employee type *</label><select class="form-control" id="psf-role" required><option value="doctor">Doctor</option><option value="nurse">Nurse</option><option value="staff">Staff</option></select></div><div class="two-col"><div class="form-group"><label for="psf-basic">Base pay (₹) *</label><input type="number" min="0" step="0.01" class="form-control" id="psf-basic" required></div><div class="form-group"><label for="psf-rate">Allowance rate (decimal) *</label><input type="number" min="0" step="0.0001" max="99.9999" class="form-control" id="psf-rate" value="0" required></div></div><div class="form-group"><label for="psf-status">Status</label><select class="form-control" id="psf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div><p class="form-help">Allowance rate is stored as a decimal multiplier (0.10 = 10%), not a rupee amount.</p></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-paystructure-form')">Cancel</button><button class="btn btn-primary" id="paystructure-form-submit">Save structure</button></div></div></div>
 
 <!-- Salary Form Modal -->
-<div class="modal-overlay" id="modal-salary-form">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <span class="modal-title">Add Salary Record</span>
-      <div class="modal-close" onclick="closeModal('modal-salary-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="two-col">
-        <div class="form-group"><label>Staff ID *</label><input class="form-control" id="slf-staff" placeholder="Staff ID" /></div>
-        <div class="form-group"><label>Month *</label><input type="month" class="form-control" id="slf-month" /></div>
-      </div>
-      <div class="two-col">
-        <div class="form-group"><label>Basic Salary (₹)</label><input type="number" class="form-control" id="slf-basic" min="0" placeholder="0" /></div>
-        <div class="form-group"><label>Deductions (₹)</label><input type="number" class="form-control" id="slf-deductions" min="0" placeholder="0" /></div>
-      </div>
-      <div class="form-group"><label>Payment Mode</label><select class="form-control" id="slf-paymode"><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option></select></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-salary-form')">Cancel</button>
-      <button class="btn btn-primary" id="salary-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-salary-form"><div class="modal"><div class="modal-header"><span class="modal-title">Salary record</span><button class="modal-close" onclick="closeModal('modal-salary-form')">×</button></div><div class="modal-body"><p class="form-help">Payroll imports are tied to completed ShiftLog records through SalaryShiftLog. For the evaluation, use the validated CSV importer and SQL demonstrations in docs/; this dialog is intentionally read-only.</p></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-salary-form')">Close</button></div></div></div>
 
 <!-- Page Templates for new sections -->
 
@@ -684,7 +555,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Branch ID</th><th>Name</th><th>Address</th><th>Phone</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Branch ID</th><th>Location</th><th>Status</th></tr></thead>
       <tbody id="branches-tbody"></tbody>
     </table></div>
   </div>
@@ -702,7 +573,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Dept ID</th><th>Name</th><th>Branch</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Department ID</th><th>Department</th><th>Branch</th><th>Status</th></tr></thead>
       <tbody id="departments-tbody"></tbody>
     </table></div>
   </div>
@@ -712,7 +583,7 @@
 <script type="text/html" id="tpl-nurses">
 <div class="page" id="page-nurses">
   <div class="page-header flex items-center justify-between flex-wrap gap-4">
-    <div><h1 class="page-title">Nurses</h1><p class="page-subtitle">Manage nursing staff across departments</p></div>
+    <div><h1 class="page-title">Nurses</h1><p class="page-subtitle">Manage nurses by assigned branch and shift</p></div>
     <div class="flex gap-2">
       <div class="search-bar" style="max-width:240px"><i class="fas fa-search"></i><input type="search" id="nurse-search" placeholder="Search nurses…" /></div>
       <button id="nurse-add-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Nurse</button>
@@ -720,7 +591,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Nurse ID</th><th>Name</th><th>Department</th><th>Phone</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Nurse ID</th><th>Name</th><th>Shift</th><th>Branch</th><th>Actions</th></tr></thead>
       <tbody id="nurses-tbody"></tbody>
     </table></div>
   </div>
@@ -738,7 +609,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Admission ID</th><th>Patient</th><th>Doctor</th><th>Room</th><th>Admitted</th><th>Discharged</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Admission ID</th><th>Patient</th><th>Branch</th><th>Room</th><th>Admitted</th><th>Discharged</th><th>Actions</th></tr></thead>
       <tbody id="admissions-tbody"></tbody>
     </table></div>
   </div>
@@ -753,7 +624,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>ID</th><th>Equipment</th><th>Department</th><th>Serial No.</th><th>Last Maintenance</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Equipment ID</th><th>Name</th><th>Branch</th><th>Location</th><th>Maintenance date</th><th>Status</th></tr></thead>
       <tbody id="equipment-tbody"></tbody>
     </table></div>
   </div>
@@ -768,7 +639,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Log ID</th><th>Staff</th><th>Branch</th><th>Date</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+      <thead><tr><th>Log ID</th><th>Employee</th><th>Employee type</th><th>Branch</th><th>Date</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
       <tbody id="shiftlogs-tbody"></tbody>
     </table></div>
   </div>
@@ -786,7 +657,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>ID</th><th>Staff / Position</th><th>Base Salary</th><th>Allowance</th><th>OT Rate</th><th>Gross</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Rule ID</th><th>Employee type</th><th>Base pay</th><th>Allowance rate</th><th>Status</th></tr></thead>
       <tbody id="paystructures-tbody"></tbody>
     </table></div>
   </div>
@@ -799,12 +670,12 @@
     <div><h1 class="page-title">Salaries</h1><p class="page-subtitle">Process and track staff salary payments</p></div>
     <div class="flex gap-2">
       <div class="search-bar" style="max-width:240px"><i class="fas fa-search"></i><input type="search" id="salary-search" placeholder="Search salaries…" /></div>
-      <button id="salary-add-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Process Salary</button>
+      
     </div>
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>ID</th><th>Staff</th><th>Month</th><th>Basic</th><th>Deductions</th><th>Net Pay</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Salary ID</th><th>Employee</th><th>Branch</th><th>Pay month</th><th>Base pay</th><th>Allowance</th><th>Total</th></tr></thead>
       <tbody id="salaries-tbody"></tbody>
     </table></div>
   </div>
@@ -812,11 +683,12 @@
 </script>
 
 <!-- Scripts -->
-<script src="js/mock-data.js"></script>
+<!-- Mock data excluded: use API records only. -->
 <script src="js/app.js"></script>
 <script src="js/clinical-enhancements.js"></script>
 <script src="js/clinical-modules.js"></script>
 <script src="js/clinical-charts-native.js"></script>
+<script src="js/schema-alignment.js"></script>
 
 <!-- ══ OT Page Template ══ -->
 <script type="text/html" id="tpl-ot">
@@ -832,7 +704,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title">OT Schedules</span></div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>ID</th><th>Theatre</th><th>Patient</th><th>Doctor</th><th>Procedure</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Schedule ID</th><th>Theatre</th><th>Patient</th><th>Doctor</th><th>Nurse</th><th>Procedure</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="ot-tbody"></tbody>
     </table></div>
   </div>
@@ -851,7 +723,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Test</th><th>Result</th><th>Normal Range</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Result ID</th><th>Patient</th><th>Test type</th><th>Ordered</th><th>Result date</th><th>Result details</th><th>Actions</th></tr></thead>
       <tbody id="lab-tbody"></tbody>
     </table></div>
   </div>
@@ -865,7 +737,7 @@
     <div><h1 class="page-title">Rooms &amp; Beds</h1><p class="page-subtitle">Manage hospital rooms, wards, and bed availability</p></div>
     <div class="flex gap-2">
       <div class="search-bar" style="max-width:240px"><i class="fas fa-search"></i><input type="search" id="room-search" placeholder="Search rooms…" /></div>
-      <select class="form-control" id="room-type-filter" style="width:auto;padding:.6rem 2.2rem .6rem .9rem"><option>All Types</option><option>general</option><option>private</option><option>icu</option><option>ot</option></select>
+      <select class="form-control" id="room-type-filter" style="width:auto;padding:.6rem 2.2rem .6rem .9rem"><option>All Types</option><option>general</option><option>private</option><option>icu</option></select>
       <button id="room-add-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Room</button>
     </div>
   </div>
@@ -877,7 +749,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Room ID</th><th>Room No.</th><th>Type</th><th>Capacity</th><th>Branch</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Branch ID</th><th>Room number</th><th>Type</th><th>Critical care monitoring</th><th>Availability</th><th>Actions</th></tr></thead>
       <tbody id="rooms-tbody"></tbody>
     </table></div>
   </div>
@@ -896,7 +768,7 @@
   </div>
   <div class="card">
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Shift ID</th><th>Doctor</th><th>Branch</th><th>Date</th><th>Start</th><th>End</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Doctor</th><th>Branch</th><th>Shift start</th><th>Shift end</th><th>Actions</th></tr></thead>
       <tbody id="doctorshifts-tbody"></tbody>
     </table></div>
   </div>
@@ -923,12 +795,13 @@
     </div>
     <div class="modal-body">
       <div class="two-col">
-        <div class="form-group"><label>Theatre ID *</label><input type="number" class="form-control" id="otf-theatre" placeholder="Theatre ID" /></div>
+        <div class="form-group"><label for="otf-theatre">Theatre *</label><select class="form-control" id="otf-theatre" required><option value="">Select theatre…</option></select></div>
         <div class="form-group"><label>Procedure</label><input class="form-control" id="otf-procedure" placeholder="e.g. Appendectomy" /></div>
       </div>
       <div class="two-col">
-        <div class="form-group"><label>Patient ID *</label><input class="form-control" id="otf-patient" placeholder="Patient ID" /></div>
-        <div class="form-group"><label>Doctor *</label><select class="form-control" id="otf-doctor"><option value="">Select Doctor…</option></select></div>
+        <div class="form-group"><label for="otf-patient">Patient *</label><select class="form-control" id="otf-patient" required><option value="">Select patient…</option></select></div>
+        <div class="form-group"><label for="otf-doctor">Doctor *</label><select class="form-control" id="otf-doctor" required><option value="">Select Doctor…</option></select></div>
+        <div class="form-group"><label for="otf-nurse">Assigned nurse *</label><select class="form-control" id="otf-nurse" required><option value="">Select nurse…</option></select></div>
       </div>
       <div class="two-col">
         <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="otf-date" /></div>
@@ -946,51 +819,10 @@
 </div>
 
 <!-- ══ Lab Result Form Modal ══ -->
-<div class="modal-overlay" id="modal-lab-form">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <span class="modal-title">Add Lab Result</span>
-      <div class="modal-close" onclick="closeModal('modal-lab-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="two-col">
-        <div class="form-group"><label>Patient ID *</label><input class="form-control" id="lf-patient" placeholder="Patient ID" /></div>
-        <div class="form-group"><label>Doctor *</label><select class="form-control" id="lf-doctor"><option value="">Select Doctor…</option></select></div>
-      </div>
-      <div class="form-group"><label>Test Name *</label><input class="form-control" id="lf-test" placeholder="e.g. CBC, Blood Glucose, Lipid Panel" /></div>
-      <div class="two-col">
-        <div class="form-group"><label>Result Value</label><input class="form-control" id="lf-result" placeholder="e.g. 5.2 mmol/L" /></div>
-        <div class="form-group"><label>Normal Range</label><input class="form-control" id="lf-range" placeholder="e.g. 3.5–5.5 mmol/L" /></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-lab-form')">Cancel</button>
-      <button class="btn btn-primary" id="lab-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-lab-form"><div class="modal"><div class="modal-header"><span class="modal-title" id="lab-form-title">Add lab result</span><button class="modal-close" onclick="closeModal('modal-lab-form')">×</button></div><div class="modal-body"><div class="two-col"><div class="form-group"><label for="lf-patient">Patient *</label><select class="form-control" id="lf-patient" required></select></div><div class="form-group"><label for="lf-test">Test type *</label><input class="form-control" id="lf-test" maxlength="120" required></div></div><div class="two-col"><div class="form-group"><label for="lf-order-date">Order date *</label><input type="date" class="form-control" id="lf-order-date" required></div><div class="form-group"><label for="lf-result-date">Result date</label><input type="date" class="form-control" id="lf-result-date"></div></div><div class="form-group"><label for="lf-result">Result details</label><textarea class="form-control" id="lf-result" rows="3"></textarea></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-lab-form')">Cancel</button><button class="btn btn-primary" id="lab-form-submit">Save result</button></div></div></div>
 
 <!-- ══ Room Form Modal ══ -->
-<div class="modal-overlay" id="modal-room-form">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Add Room</span>
-      <div class="modal-close" onclick="closeModal('modal-room-form')"><i class="fas fa-times"></i></div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Room Number *</label><input class="form-control" id="rf-number" placeholder="e.g. 201A" /></div>
-      <div class="form-group"><label>Branch ID *</label><input type="number" class="form-control" id="rf-branch" placeholder="Branch ID" value="1" /></div>
-      <div class="two-col">
-        <div class="form-group"><label>Type</label><select class="form-control" id="rf-type"><option value="general">General</option><option value="private">Private</option><option value="icu">ICU</option><option value="ot">OT</option></select></div>
-        <div class="form-group"><label>Capacity</label><input type="number" class="form-control" id="rf-capacity" min="1" value="1" /></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-room-form')">Cancel</button>
-      <button class="btn btn-primary" id="room-form-submit"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="modal-room-form"><div class="modal"><div class="modal-header"><span class="modal-title">Add room / ICU</span><button class="modal-close" onclick="closeModal('modal-room-form')">×</button></div><div class="modal-body"><div class="two-col"><div class="form-group"><label for="rf-branch">Branch *</label><select class="form-control" id="rf-branch" required></select></div><div class="form-group"><label for="rf-number">Room number *</label><input class="form-control" id="rf-number" maxlength="20" required></div></div><div class="two-col"><div class="form-group"><label for="rf-type">Room type</label><select class="form-control" id="rf-type"><option value="general">General</option><option value="private">Private</option><option value="icu">ICU</option></select></div><div class="form-group"><label for="rf-monitor">Critical care monitoring</label><select class="form-control" id="rf-monitor"><option value="false">No</option><option value="true">Yes</option></select></div></div><div class="form-group"><label for="rf-status">Availability</label><select class="form-control" id="rf-status"><option value="available">Available</option><option value="occupied">Occupied</option><option value="reserved">Reserved</option><option value="maintenance">Maintenance</option></select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-room-form')">Cancel</button><button class="btn btn-primary" id="room-form-submit">Save room</button></div></div></div>
 
 <!-- ══ Doctor Shift Form Modal ══ -->
 <div class="modal-overlay" id="modal-doctorshift-form">
@@ -1002,7 +834,7 @@
     <div class="modal-body">
       <div class="two-col">
         <div class="form-group"><label>Doctor *</label><select class="form-control" id="dsf-doctor"><option value="">Select Doctor…</option></select></div>
-        <div class="form-group"><label>Branch ID *</label><input type="number" class="form-control" id="dsf-branch" placeholder="Branch ID" value="1" /></div>
+        <div class="form-group"><label>Branch ID *</label><select class="form-control" id="dsf-branch" required></select></div>
       </div>
       <div class="form-group"><label>Shift Date *</label><input type="date" class="form-control" id="dsf-date" /></div>
       <div class="two-col">

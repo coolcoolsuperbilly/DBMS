@@ -218,3 +218,8 @@
 .app-shell .settings-kv span { color:#999ba8; }
 .app-shell .settings-kv strong { font-weight:550;color:#e2e2e9; }
 @media(max-width:650px) { .app-shell .rx-edit-row { grid-template-columns:1fr 1fr; } .app-shell .settings-kv { grid-template-columns:1fr;gap:5px; } }
+/* Hidden navigation entries must remain hidden even with .nav-item display:flex. */
+.app-shell .sidebar .nav-item[hidden] { display:none !important; }
+/* Consistent, crisp login-overflow boundaries are specified in index.html. */
+
+.app-shell #page-content [hidden]{display:none!important}

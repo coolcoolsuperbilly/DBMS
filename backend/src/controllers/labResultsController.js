@@ -48,8 +48,8 @@ exports.createLabResult = async (req, res, next) => {
     const patientId = req.body.patientId || req.body.patient_id;
     const testType = req.body.testType || req.body.testName;
     const orderDate = req.body.orderDate || new Date().toISOString().split('T')[0];
-    const resultDetails = req.body.resultDetails || req.body.resultValue || (req.body.normalRange ? `Result: ${req.body.resultValue || 'Pending'} (Normal: ${req.body.normalRange})` : null);
-    const resultDate = req.body.resultDate || (req.body.resultValue ? new Date().toISOString().split('T')[0] : null);
+    const resultDetails = req.body.resultDetails ?? req.body.resultValue ?? null;
+    const resultDate = req.body.resultDate || null;
 
     if (!patientId || !testType) {
       return sendError(res, 400, 'Patient and test type/name are required.');
