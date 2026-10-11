@@ -34,7 +34,8 @@ CREATE TABLE doctor (
     name VARCHAR(120) NOT NULL,
     specialization VARCHAR(120),
     phone VARCHAR(25),
-    department_id INTEGER NOT NULL REFERENCES department(department_id)
+    department_id INTEGER NOT NULL REFERENCES department(department_id),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE doctor_shift (
@@ -311,6 +312,7 @@ BEGIN
       JOIN hms.department dep ON dep.department_id = d.department_id
       JOIN hms.branch b ON b.branch_id = NEW.branch_id
      WHERE d.doctor_id = NEW.doctor_id
+       AND d.is_active = TRUE
        AND dep.status = 'active' AND b.status = 'active';
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Doctor primary department or selected branch is inactive';

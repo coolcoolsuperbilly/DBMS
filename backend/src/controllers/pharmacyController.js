@@ -42,9 +42,13 @@ exports.getInventory = async (req, res, next) => {
   }
 };
 
+const whole = (v,min=0)=>/^\d+$/.test(String(v??'')) && Number.isSafeInteger(Number(v)) && Number(v)>=min;
+const priceOk=v=>/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(String(v??'')) && Number.isFinite(Number(v));
+
 exports.addInventory = async (req, res, next) => {
   try {
     const { medicineId, stockQuantity, price, reorderLevel } = req.body;
+    if(!whole(medicineId,1)||!whole(stockQuantity)||!whole(reorderLevel??0)||!priceOk(price))return sendError(res,400,'Medicine ID and stock/reorder quantities must be whole numbers and price must have at most two decimal places.');
     if (!medicineId || stockQuantity === undefined || price === undefined) {
       return sendError(res, 400, 'Medicine, stock quantity and price are required.');
     }
@@ -74,6 +78,10 @@ exports.addInventory = async (req, res, next) => {
 exports.updateInventory = async (req, res, next) => {
   try {
     const { stockQuantity, price, reorderLevel, action } = req.body;
+    const qtyCheck=req.body.quantity!==undefined?req.body.quantity:stockQuantity;
+    if(qtyCheck!==undefined&&!whole(qtyCheck,action==='dispense'||action==='deduct'?1:0))return sendError(res,400,'Stock quantity must be a non-negative whole number.');
+    if(reorderLevel!==undefined&&!whole(reorderLevel))return sendError(res,400,'Reorder threshold must be a whole number.');
+    if(price!==undefined&&!priceOk(price))return sendError(res,400,'Price must have at most two decimal places.');
 
     const client = await db.pool.connect();
     try {

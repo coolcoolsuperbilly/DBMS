@@ -94,50 +94,30 @@ exports.createPatient = async (req, res, next) => {
 
 exports.updatePatient = async (req, res, next) => {
   try {
-    const current = await db.query('SELECT * FROM patient WHERE patient_id = $1', [req.params.id]);
-    if (!current.rows.length) {
-      return sendError(res, 404, 'Patient not found.');
+    const id = req.params.id;
+    if (!/^\d+$/.test(String(id)) || Number(id) < 1) return sendError(res, 400, 'Invalid patient ID.');
+    const body = req.body;
+    const updates = [];
+    const params = [];
+    const set = (column, value) => { updates.push(`${column} = $${params.push(value)}`); };
+    if (Object.prototype.hasOwnProperty.call(body, 'name') || Object.prototype.hasOwnProperty.call(body, 'firstName')) {
+      const name = String(body.name ?? [body.firstName, body.lastName].filter(Boolean).join(' ')).trim();
+      if (!name || name.length > 120) return sendError(res, 400, 'Patient name must be 1–120 characters.');
+      set('name', name);
     }
-
-    let resolvedName = req.body.name;
-    if (!resolvedName && (req.body.firstName || req.body.lastName)) {
-      resolvedName = [req.body.firstName, req.body.lastName].filter(Boolean).join(' ');
+    for (const [column, keys] of [
+      ['dob', ['dob','dateOfBirth']], ['gender', ['gender']],
+      ['street', ['street','address']], ['city',['city']], ['state',['state']],
+      ['pin_code',['pinCode','pin_code']], ['phone',['phone','contact']]
+    ]) {
+      const key = keys.find(k => Object.prototype.hasOwnProperty.call(body,k));
+      if (key !== undefined) set(column, body[key] === '' ? null : body[key]);
     }
-
-    const resolvedDob = req.body.dob || req.body.dateOfBirth;
-    const resolvedStreet = req.body.street || req.body.address;
-    const resolvedPin = req.body.pinCode || req.body.pin_code;
-    const resolvedPhone = req.body.phone || req.body.contact;
-
-    const result = await db.query(
-      `UPDATE patient
-       SET name = COALESCE($1, name),
-           dob = COALESCE($2, dob),
-           gender = COALESCE($3, gender),
-           street = COALESCE($4, street),
-           city = COALESCE($5, city),
-           state = COALESCE($6, state),
-           pin_code = COALESCE($7, pin_code),
-           phone = COALESCE($8, phone)
-       WHERE patient_id = $9
-       RETURNING *`,
-      [
-        resolvedName,
-        resolvedDob || null,
-        req.body.gender,
-        resolvedStreet,
-        req.body.city,
-        req.body.state,
-        resolvedPin,
-        resolvedPhone,
-        req.params.id,
-      ]
-    );
-
-    return sendSuccess(res, 200, { patient: mapPatient(result.rows[0]) });
-  } catch (error) {
-    next(error);
-  }
+    if (!updates.length) return sendError(res, 400, 'No patient fields supplied.');
+    const changed = await db.query(`UPDATE patient SET ${updates.join(', ')} WHERE patient_id = $${params.push(id)} RETURNING *`, params);
+    if (!changed.rows.length) return sendError(res, 404, 'Patient not found.');
+    return sendSuccess(res, 200, { patient: mapPatient(changed.rows[0]) });
+  } catch (error) { next(error); }
 };
 
 exports.deletePatient = async (req, res, next) => {

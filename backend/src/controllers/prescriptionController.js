@@ -64,8 +64,21 @@ exports.getPrescriptionById = async (req, res, next) => {
 exports.createPrescription = async (req, res, next) => {
   try {
     const { patientId, doctorId, prescriptionDate, medicines } = req.body;
-    if (!patientId || !doctorId || !Array.isArray(medicines) || medicines.length === 0) {
-      return sendError(res, 400, 'Patient, doctor, and at least one medicine are required.');
+    const validId = value => /^\d+$/.test(String(value ?? '')) && Number.isSafeInteger(Number(value)) && Number(value)>0;
+    if (!validId(patientId) || !validId(doctorId) || !Array.isArray(medicines) || medicines.length === 0) {
+      return sendError(res, 400, 'Valid patient ID, doctor ID and at least one medicine are required.');
+    }
+    if (prescriptionDate && !/^\d{4}-\d{2}-\d{2}$/.test(prescriptionDate))
+      return sendError(res, 400, 'Prescription date must be YYYY-MM-DD.');
+    const medicineIds=new Set();
+    for (const med of medicines) {
+      if(!validId(med.medicineId))return sendError(res,400,'Each medicine must have a positive integer ID.');
+      if(medicineIds.has(Number(med.medicineId)))return sendError(res,400,'Each medicine can appear only once per prescription.');
+      medicineIds.add(Number(med.medicineId));
+      if(!/^\d+$/.test(String(med.quantity ?? '')) || !Number.isSafeInteger(Number(med.quantity)) || Number(med.quantity)<=0)
+        return sendError(res,400,'Medicine quantity must be a positive whole number.');
+      if(!String(med.dosage??'').trim() || String(med.dosage).length>100)
+        return sendError(res,400,'Dosage must contain 1–100 characters.');
     }
 
     const client = await db.pool.connect();
@@ -78,7 +91,7 @@ exports.createPrescription = async (req, res, next) => {
         throw new Error('PATIENT_NOT_FOUND');
       }
 
-      const doctor = await client.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1', [doctorId]);
+      const doctor = await client.query('SELECT doctor_id FROM doctor WHERE doctor_id = $1 AND is_active', [doctorId]);
       if (!doctor.rows.length) {
         throw new Error('DOCTOR_NOT_FOUND');
       }
@@ -101,10 +114,7 @@ exports.createPrescription = async (req, res, next) => {
           throw new Error('MEDICINE_NOT_FOUND');
         }
 
-        const quantity = Number(med.quantity || 1);
-        if (quantity <= 0) {
-          throw new Error('INVALID_PRESCRIPTION_QUANTITY');
-        }
+        const quantity = Number(med.quantity);
 
         await client.query(
           `INSERT INTO prescription_detail (prescription_id, medicine_id, dosage, quantity)

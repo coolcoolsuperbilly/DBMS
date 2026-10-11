@@ -42,77 +42,33 @@ exports.getBillById = async (req, res, next) => {
   }
 };
 
+const positiveId = value => /^\d+$/.test(String(value ?? '')) && Number.isSafeInteger(Number(value)) && Number(value)>0;
+const validMoney = value => /^(0|[1-9]\d*)(\.\d{1,2})?$/.test(String(value ?? '')) && Number.isFinite(Number(value));
 exports.createBill = async (req, res, next) => {
   try {
-    let appointmentId = req.body.appointmentId || req.body.appointment_id;
-    const patientId = req.body.patientId || req.body.patient_id;
-    let branchId = req.body.branchId || req.body.branch_id;
-    const amount = req.body.amount !== undefined ? req.body.amount : (req.body.total_amount !== undefined ? req.body.total_amount : req.body.totalAmount);
-    const paymentStatus = req.body.paymentStatus || req.body.payment_status || req.body.status || 'unpaid';
-    const otScheduleId = req.body.otScheduleId || req.body.ot_schedule_id;
-
-    if (!appointmentId && patientId) {
-      // Find latest unbilled appointment for this patient
-      const unbilled = await db.query(
-        `SELECT a.appointment_id, a.branch_id
-         FROM appointment a
-         WHERE a.patient_id = $1
-           AND NOT EXISTS (SELECT 1 FROM bill b WHERE b.appointment_id = a.appointment_id)
-         ORDER BY a.appointment_date DESC, a.appointment_time DESC
-         LIMIT 1`,
-        [patientId]
-      );
-
-      if (unbilled.rows.length) {
-        appointmentId = unbilled.rows[0].appointment_id;
-        if (!branchId) branchId = unbilled.rows[0].branch_id;
-      } else {
-        // Auto-create a consultation appointment for this patient to satisfy the BCNF appointment_id FK
-        const doc = await db.query('SELECT doctor_id, branch_id FROM doctor LIMIT 1');
-        const docId = doc.rows[0]?.doctor_id || 1;
-        const bId = branchId || doc.rows[0]?.branch_id || 1;
-        const maxTok = await db.query('SELECT COALESCE(MAX(token_no), 0) + 1 AS next_tok FROM appointment WHERE branch_id = $1 AND appointment_date = CURRENT_DATE', [bId]);
-        const tok = maxTok.rows[0].next_tok;
-
-        const newAppt = await db.query(
-          `INSERT INTO appointment (patient_id, doctor_id, branch_id, appointment_date, appointment_time, token_no, status)
-           VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, 'completed')
-           RETURNING appointment_id, branch_id`,
-          [patientId, docId, bId, tok]
-        );
-        appointmentId = newAppt.rows[0].appointment_id;
-        if (!branchId) branchId = newAppt.rows[0].branch_id;
-      }
-    }
-
-    if (!appointmentId) return sendError(res, 400, 'Appointment or patient is required.');
-
-    // Auto-derive branchId from appointment if omitted
-    if (!branchId) {
-      const appt = await db.query('SELECT branch_id FROM appointment WHERE appointment_id = $1', [appointmentId]);
-      if (!appt.rows.length) return sendError(res, 404, 'Referenced appointment not found.');
-      branchId = appt.rows[0].branch_id;
-    }
-
-    // The DB trigger check_bill_operation_complete validates branch match and OT rules
-    const result = await db.query(
-      `INSERT INTO bill (appointment_id, branch_id, amount, payment_status, ot_schedule_id)
-       VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, 'unpaid'), $5)
-       RETURNING *`,
-      [appointmentId, branchId, Number(amount || 0), paymentStatus, otScheduleId || null]
-    );
-
-    return sendSuccess(res, 201, { bill: mapBill(result.rows[0]) });
-  } catch (error) {
-    if (error.message && error.message.includes('RAISE')) {
-      return sendError(res, 400, error.message);
-    }
-    next(error);
-  }
+    const appointmentId = req.body.appointmentId ?? req.body.appointment_id;
+    const amount = req.body.amount ?? req.body.totalAmount ?? req.body.total_amount;
+    const paymentStatus = req.body.paymentStatus ?? 'unpaid';
+    const otScheduleId = req.body.otScheduleId ?? req.body.ot_schedule_id ?? null;
+    if (!positiveId(appointmentId)) return sendError(res,400,'An existing appointment ID is required.');
+    if (!validMoney(amount)) return sendError(res,400,'Amount must be non-negative with at most two decimal places.');
+    if (!['paid','unpaid','partial','cancelled'].includes(paymentStatus))return sendError(res,400,'Invalid payment status.');
+    if (otScheduleId !== null && !positiveId(otScheduleId))return sendError(res,400,'Invalid operation schedule ID.');
+    const appointment = await db.query('SELECT appointment_id, branch_id, status FROM appointment WHERE appointment_id=$1',[appointmentId]);
+    if(!appointment.rows.length)return sendError(res,404,'Referenced appointment does not exist.');
+    if(appointment.rows[0].status!=='completed')return sendError(res,409,'Only completed appointments can be billed.');
+    const branchId=appointment.rows[0].branch_id;
+    if(req.body.branchId!==undefined&&Number(req.body.branchId)!==Number(branchId))return sendError(res,400,'Billing branch must match appointment branch.');
+    const result = await db.query(`INSERT INTO bill(appointment_id,branch_id,amount,payment_status,ot_schedule_id)
+      VALUES($1,$2,$3,$4,$5) RETURNING *`,[appointmentId,branchId,amount,paymentStatus,otScheduleId]);
+    return sendSuccess(res,201,{bill:mapBill(result.rows[0])});
+  }catch(error){next(error);}
 };
 
 exports.updateBill = async (req, res, next) => {
   try {
+    if(req.body.amount!==undefined && !validMoney(req.body.amount))return sendError(res,400,'Invalid invoice amount.');
+    if(req.body.paymentStatus!==undefined && !['unpaid','partial','paid','cancelled'].includes(req.body.paymentStatus))return sendError(res,400,'Invalid invoice status.');
     const result = await db.query(
       `UPDATE bill
        SET amount = COALESCE($1, amount),
@@ -132,6 +88,7 @@ exports.updateBill = async (req, res, next) => {
 exports.recordPayment = async (req, res, next) => {
   try {
     const { amount: paymentAmount } = req.body;
+    if(paymentAmount!==undefined && !validMoney(paymentAmount))return sendError(res,400,'Invalid payment amount.');
     const current = await db.query('SELECT * FROM bill WHERE bill_id = $1', [req.params.id]);
     if (!current.rows.length) return sendError(res, 404, 'Bill not found.');
 

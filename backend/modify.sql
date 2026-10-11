@@ -4,6 +4,25 @@
 
 SET search_path TO hms, public;
 
+-- Existing installations: preserve clinical history when a doctor is archived.
+ALTER TABLE hms.doctor ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Replace the appointment trigger function with the current active-doctor rule
+-- when upgrading an already initialized database.
+CREATE OR REPLACE FUNCTION hms.reject_archived_appointment() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.status IN ('pending', 'confirmed') AND
+     NOT EXISTS (SELECT 1 FROM hms.doctor WHERE doctor_id = NEW.doctor_id AND is_active) THEN
+    RAISE EXCEPTION 'Cannot schedule an appointment with an archived doctor';
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS appointment_active_doctor ON hms.appointment;
+CREATE TRIGGER appointment_active_doctor BEFORE INSERT OR UPDATE OF doctor_id,status
+ON hms.appointment FOR EACH ROW EXECUTE FUNCTION hms.reject_archived_appointment();
+
+
 -- Enable pgcrypto for password hashing
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -51,7 +70,7 @@ BEGIN
     SELECT
         (SELECT COUNT(*) FROM hms.patient)::BIGINT,
         (SELECT COUNT(*) FROM hms.admission WHERE discharge_date_time IS NULL)::BIGINT,
-        (SELECT COUNT(*) FROM hms.doctor)::BIGINT,
+        (SELECT COUNT(*) FROM hms.doctor WHERE is_active)::BIGINT,
         (SELECT COUNT(*) FROM hms.appointment WHERE status IN ('pending','confirmed') AND appointment_date >= CURRENT_DATE)::BIGINT,
         (SELECT COUNT(*) FROM hms.bill WHERE payment_status IN ('unpaid','partial'))::BIGINT,
         COALESCE((SELECT SUM(amount) FROM hms.bill WHERE payment_status = 'paid'), 0::NUMERIC),
